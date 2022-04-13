@@ -81,7 +81,7 @@ class YOLOInit(nn.Module):
 
     def pre_process_detect(self,
                            im_path,  # 用于存图等的逻辑撰写
-                           im_draw_path,
+                           result_roi_q,
                            left_edge,
                            right_edge,
                            img_draw,  # 画坐标框用于可视化
@@ -178,7 +178,7 @@ class YOLOInit(nn.Module):
             if x2 <= left_edge or x1 >= right_edge:
                 continue
             # 扩展ROI
-            x1_cut,y1_cut,x2_cut,y2_cut = x1-75, y1-75, x2+75, y2+75
+            x1_cut,y1_cut,x2_cut,y2_cut = x1-25, y1-25, x2+25, y2+25
 
             if x1_cut < 0:
                 x1_cut = 1
@@ -190,27 +190,33 @@ class YOLOInit(nn.Module):
             if y2_cut > h_img_ori:
                 y2_cut = h_img_ori-1
 
-            # box在 ROI的 位置
-            # cut roi from image
-            x1_roi,y1_roi = abs(x1-x1_cut),abs(y1-y1_cut)
-            x2_roi,y2_roi = x1_roi+(x2-x1),y1_roi+(y2-y1)
-            im_roi = img_split[y1_cut:y2_cut,x1_cut:x2_cut]
-
-            # 画ROI中的框
-            im_roi_draw = im_roi.copy()
-            im_roi_draw = cv2.cvtColor(im_roi_draw,cv2.COLOR_GRAY2RGB)
-            cv2.rectangle(im_roi_draw, (x1_roi,y1_roi), (x2_roi,y2_roi), (255,0,0), thickness=3, lineType=cv2.LINE_AA)
-            roi_file_path = '_'.join([file_name, str(i),
-                                      str(x1), str(y1), str(x2), str(y2),
-                                      str(x1_cut), str(y1_cut), str(x2_cut), str(y2_cut),
-                                      str(x1_roi), str(y1_roi), str(x2_roi), str(y2_roi),
-                                      ]) + f'.{file_mat}'
-            fflag = True
-            if fflag:
-                if not os.path.exists('small_img_1'):
-                    os.makedirs('small_img_1')
-                path_save = os.path.join('small_img_1', roi_file_path)
-                cv2.imwrite(path_save,im_roi_draw)
+            # # box在 ROI的 位置
+            # # cut roi from image
+            # x1_roi,y1_roi = abs(x1-x1_cut),abs(y1-y1_cut)
+            # x2_roi,y2_roi = x1_roi+(x2-x1),y1_roi+(y2-y1)
+            # im_roi = img_split[y1_cut:y2_cut,x1_cut:x2_cut]
+            #
+            # # 画ROI中的框
+            # im_roi_draw = im_roi.copy()
+            # im_roi_draw = cv2.cvtColor(im_roi_draw,cv2.COLOR_GRAY2RGB)
+            # cv2.rectangle(im_roi_draw, (x1_roi,y1_roi), (x2_roi,y2_roi), (255,0,0), thickness=3, lineType=cv2.LINE_AA)
+            img_roi = img_split[y1_cut:y2_cut, x1_cut:x2_cut]
+            if debug:
+                roi_file_name = '_'.join([file_name, str(i),
+                                          str(x1), str(y1), str(x2), str(y2),
+                                          ]) + f'.{file_mat}'
+            else:
+                flag_str,steel_no,camera_no,img_index,left_pos,top_pos,fx,fy,_ = file_name.split('_')
+                left_in_steel,top_in_steel = left_pos+x1*fx, top_pos+y1*fy
+                right_in_steel,bot_in_steel = right_in_steel+x2*fx, top_pos+y2*fy
+                roi_file_name = '_'.join([str(flag_str), str(steel_no),str(camera_no),str(img_index),
+                                          str(left_edge),str(right_edge),
+                                          str(x1), str(x2), str(y2), str(y2),
+                                          str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
+                                          'H'
+                                          ]) + f'.{file_mat}'
+            img_roi_info = {'data':img_roi,'name':roi_file_name}
+            result_roi_q.put(img_roi_info)
             if debug:
                 # 画图中的框
                 p1, p2 = (x1,y1), (x2,y2)
@@ -228,7 +234,8 @@ class YOLOInit(nn.Module):
                 cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
                 cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
 
-        if debug:
+        if not debug:
+            im_draw_path = './debug_result/images/'
             if not os.path.exists(im_draw_path):
                 os.makedirs(im_draw_path)
             file_name = os.path.basename(im_path)

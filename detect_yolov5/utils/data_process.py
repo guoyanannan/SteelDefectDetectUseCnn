@@ -373,7 +373,7 @@ def read_images(dirs_path, q, schema, log_path):
                         # file_name = os.path.basename(path)
                         dict_info = {'img_rgb':img_arr_rgb, 'img_path': path}
                         q.put(dict_info)
-                        #remove_file(path,logger=logger)
+                        remove_file(path,logger=logger)
         else:
             # dir_path (path1,path2),几个相机写几个,地址需至包含 0 1目录
             # 读物info.json文件获取当前流水号，图像数量
@@ -402,8 +402,9 @@ def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
                     index = 0
 
             else:
-                time.sleep(0.1)
-                logger.info(f'数据队列暂时没有新数据，等待！！！！！！！！！！！！！！！！')
+                time.sleep(0.01)
+                # logger.info(f'数据队列暂时没有新数据，等待！！！！！！！！！！！！！！！！')
+                print(f'数据队列暂时没有新数据，等待！！！！！！！！！！！！！！！！')
 
 
         else:
