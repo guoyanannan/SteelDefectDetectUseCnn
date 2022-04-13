@@ -16,9 +16,13 @@ from detect_yolov5.utils.normaloperation import LOGS
 
 #(img_arr_rgb, cam_resolution, imgsz, stride, device, pt)
 def data_tensor_infer(q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,logger):
+
     model_obj.to(device)
+    currt_num = 1
+    total_time = 0
     while 1:
         if not q.empty():
+            start_time = time.time()
             img_infos = q.get()
             img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
             img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
@@ -42,10 +46,15 @@ def data_tensor_infer(q,model_obj,cam_resolution,img_resize,stride,device,auto,c
                                      cam_resolution,
                                      debug=debug
                                      )
-
+            end_time = time.time()
+            currt_num +=1
+            total_time += end_time-start_time
+            print(f'累计处理了{currt_num}张图片,平均耗时{total_time/currt_num}s')
         else:
-            logger.info('暂时没有数据了,等待！！！！！！！！！！！！！！！！！')
+            logger.info(f'{os.getpid()}-结束时间：{time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime())},累计处理了{currt_num}张图片,平均耗时{total_time/currt_num}s')
+            #print(f'{os.getpid()}-结束时间：', time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()))
             time.sleep(1)
+
 
 @torch.no_grad()
 def run(weights='yolov5s.pt',  # model.pt path(s)
@@ -71,18 +80,20 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         ):
 
     source = dirs
-    my_log = LOGS(log_path)
-    model = YOLOInit(weights, gpu_cpu=device, half=half, log_op=my_log,augment=augment,visualize=visualize ,dnn=dnn)
+    # my_log = LOGS(log_path)
+    model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path,augment_=augment,visualize_=visualize, dnn=dnn)
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
     print(source,stride, names, pt, device,imgsz)
-    read_queue = Queue(100)
-    queue_list = [Queue(100)]
-    read_pro = Process(target=read_images, args=(source,read_queue,schema,my_log))
-    select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, my_log))
+    read_queue = Queue(150)
+    queue_list = [Queue(100),Queue(100),Queue(100)]
+    read_pro = Process(target=read_images, args=(source,read_queue,schema,log_path))
+    select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, log_path))
     read_pro.start()
     select_edge_pro.start()
+
     for i in range(len(queue_list)):
+        print(f'进程{i}')
         q_get_info = queue_list[i]
         run_pro = Process(target=data_tensor_infer,
                           args=(q_get_info,
@@ -98,11 +109,11 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                                 agnostic_nms,
                                 max_det,
                                 debug,
-                                my_log
+                                LOGS(log_path)
                                 )
                           )
         run_pro.start()
-
+    print('开始时间：', time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()))
     # while 1:
     #     for i in range(len(queue_list)):
     #         if not queue_list[i].empty():
@@ -357,7 +368,7 @@ def parse_opt():
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     parser.add_argument('--is_test', action='store_true', help='use test for inference')
-    parser.add_argument('--debug', action='store_true',default=True, help='use debug mode')
+    parser.add_argument('--debug', action='store_true',default=False, help='use debug mode')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args('detect', opt)

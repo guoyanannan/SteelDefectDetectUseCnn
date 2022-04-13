@@ -14,10 +14,10 @@ sys.path.append(ROOT)
 
 class YOLOInit(nn.Module):
 
-    def __init__(self, weights, gpu_cpu, half, log_op,augment_,visualize_ ,dnn=False):
+    def __init__(self, weights, gpu_cpu, half, log_path,augment_,visualize_ ,dnn=False):
         super().__init__()
         self.weights = weights
-        self.log_op = log_op
+        self.log_op = LOGS(log_path)
         self.fp16 = half
         self.dnn = dnn
         self.device = select_device(gpu_cpu, self.log_op)
@@ -211,21 +211,22 @@ class YOLOInit(nn.Module):
                     os.makedirs('small_img_1')
                 path_save = os.path.join('small_img_1', roi_file_path)
                 cv2.imwrite(path_save,im_roi_draw)
-            # 画图中的框
-            p1, p2 = (x1,y1), (x2,y2)
-            label = f'{self.names[int(box[-1])]}:{box[-2]:.2f}'
-            color,txt_color, lw= (0, 0, 255), (255, 255, 255), 3
-            cv2.rectangle(img_draw_, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
-            # 写框的信息
-            tf = max(lw - 1, 1)  # font thickness
-            w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height
-            outside = p1[1] - h - 3 >= 0  # label fits outside box
-            p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
-            cv2.rectangle(img_draw_, p1, p2, color, -1, cv2.LINE_AA)  # filled
-            cv2.putText(img_draw_, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color,thickness=tf, lineType=cv2.LINE_AA)
-            # 边界
-            cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
-            cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
+            if debug:
+                # 画图中的框
+                p1, p2 = (x1,y1), (x2,y2)
+                label = f'{self.names[int(box[-1])]}:{box[-2]:.2f}'
+                color,txt_color, lw= (0, 0, 255), (255, 255, 255), 3
+                cv2.rectangle(img_draw_, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
+                # 写框的信息
+                tf = max(lw - 1, 1)  # font thickness
+                w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height
+                outside = p1[1] - h - 3 >= 0  # label fits outside box
+                p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
+                cv2.rectangle(img_draw_, p1, p2, color, -1, cv2.LINE_AA)  # filled
+                cv2.putText(img_draw_, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color,thickness=tf, lineType=cv2.LINE_AA)
+                # 边界
+                cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
+                cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
 
         if debug:
             if not os.path.exists(im_draw_path):

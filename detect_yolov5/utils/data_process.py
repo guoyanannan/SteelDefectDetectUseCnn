@@ -5,6 +5,7 @@ import torch
 import time
 import numpy as np
 from PIL import Image
+from .normaloperation import LOGS
 
 
 IMG_FORMATS = 'bmp', 'jpeg', 'jpg',  'png'
@@ -356,7 +357,8 @@ def get_input_tensor(img_arr,  # img RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
-def read_images(dirs_path, q, schema, logger):
+def read_images(dirs_path, q, schema, log_path):
+    logger = LOGS(log_path)
     curr_seq = 0
     last_seq = -100
     while True:
@@ -383,23 +385,26 @@ def read_images(dirs_path, q, schema, logger):
             pass
 
 
-def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, logger):
-
+def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
+    logger = LOGS(log_path)
+    index = 0
     while True:
-        index = 0
         if schema:
             if not q.empty():
                 img_infos = q.get()
-                index += 1
                 img_arr_rgb,img_path = img_infos['img_rgb'],img_infos['img_path']
                 l_e, r_e = select_edge(img_arr_rgb, edge_shift, bin_thres, cam_resolution=cam_res)
                 infos = {'img_rgb':img_arr_rgb,'img_path':img_path,'left_e':l_e, 'right_e':r_e}
                 q_index = index % len(q_list)
                 q_list[q_index].put(infos)
+                index += 1
+                if index > 10000:
+                    index = 0
 
             else:
                 time.sleep(0.1)
-                logger.info(f'暂时没有新数据，等待！！！！！！！！！！！！！！！！')
+                logger.info(f'数据队列暂时没有新数据，等待！！！！！！！！！！！！！！！！')
+
 
         else:
             pass
