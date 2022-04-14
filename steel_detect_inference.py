@@ -15,8 +15,8 @@ from detect_yolov5.utils.normaloperation import LOGS
 
 
 #(img_arr_rgb, cam_resolution, imgsz, stride, device, pt)
-def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,logger):
-
+def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,log_path):
+    logger = LOGS(log_path)
     model_obj.to(device)
     currt_num = 1
     total_time = 0
@@ -28,32 +28,35 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
             img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
                 = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto)
             model_obj.pre_process_detect(img_path,
-                                     result_roi_q,
-                                     left_eg,
-                                     right_eg,
-                                     img_arr_rgb,
-                                     img_cut_bs_scale_tensor,
-                                     img_cut_bs_shape,
-                                     img_ori_one_scale_tensor,
-                                     img_ori_one_shape,
-                                     img_cut_two_scale_tensor,
-                                     img_cut_two_shape,
-                                     conf_thres,
-                                     iou_thres,
-                                     classes,
-                                     agnostic_nms,
-                                     max_det,
-                                     cam_resolution,
-                                     debug=debug
-                                     )
+                                         result_roi_q,
+                                         left_eg,
+                                         right_eg,
+                                         img_arr_rgb,
+                                         img_cut_bs_scale_tensor,
+                                         img_cut_bs_shape,
+                                         img_ori_one_scale_tensor,
+                                         img_ori_one_shape,
+                                         img_cut_two_scale_tensor,
+                                         img_cut_two_shape,
+                                         conf_thres,
+                                         iou_thres,
+                                         classes,
+                                         agnostic_nms,
+                                         max_det,
+                                         cam_resolution,
+                                         debug=debug,
+                                        )
             end_time = time.time()
-            currt_num +=1
+            currt_num += 1
             total_time += end_time-start_time
-            print(f'process-{os.getpid()}累计处理了{currt_num}张图片,平均耗时{total_time/currt_num}s')
+            print(f'process-{os.getpid()}:处理了{currt_num}张图片,平均耗时{total_time/currt_num}s')
+            if currt_num > 100000:
+                logger.info(f'process-{os.getpid()}:处理了{currt_num}张图片,平均耗时{total_time / currt_num}s')
+                currt_num = 0
+                total_time = 0
         else:
-            logger.info(f'process-{os.getpid()}-结束时间：{time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime())},累计处理了{currt_num}张图片,平均耗时{total_time/currt_num}s')
-            #print(f'{os.getpid()}-结束时间：', time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()))
-            time.sleep(1)
+            print(f'>>>>>>>>>>>>>>>>warning>>>>>>>>>>>>>>>:process-{os.getpid()}:算法处理速度快于图像前处理>>>>>>>>>')
+            time.sleep(0.5)
 
 
 @torch.no_grad()
@@ -85,8 +88,8 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
     print(source,stride, names, pt, device,imgsz)
-    read_queue = Queue(300)
-    roi_q = Queue(1000)
+    read_queue = Queue(500)
+    roi_q = Queue()
     queue_list = [Queue(100),Queue(100),Queue(100)]
     read_pro = Process(target=read_images, args=(source,read_queue,schema,log_path))
     select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, log_path))
@@ -94,7 +97,6 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     select_edge_pro.start()
 
     for i in range(len(queue_list)):
-        print(f'进程{i}')
         q_get_info = queue_list[i]
         run_pro = Process(target=data_tensor_infer,
                           args=(q_get_info,
@@ -111,10 +113,11 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                                 agnostic_nms,
                                 max_det,
                                 debug,
-                                LOGS(log_path)
+                                log_path
                                 )
                           )
         run_pro.start()
+        logger_.info(f'process {i} starting success ')
     print('开始时间：', time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()))
     while 1:
         if not roi_q.empty():

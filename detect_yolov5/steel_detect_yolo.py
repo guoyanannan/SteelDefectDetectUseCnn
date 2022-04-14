@@ -105,29 +105,36 @@ class YOLOInit(nn.Module):
         #     print('多张图无缩放的尺寸:', im_bs_ori_shape)
         #     print('原图缩放后拼成的batchtensor:', im_one_scale.shape)
         #     print('原图无缩放的尺寸:', im_one_orin_shape)
-        if cam_resolution == '4k':
+        if cam_resolution.lower() == '4k':
             split_stride = 768
-        elif cam_resolution == '8k':
+        elif cam_resolution.lower() == '8k':
             split_stride = 896
+            im_one_scale = im_two_scale
+            im_one_orin_shape = im_two_orin_shape
 
         img_get_shape = (im_bs_scale.shape, im_one_scale.shape)
         img_get_shape_ori = (im_bs_ori_shape, im_one_orin_shape)
-
-        pred_five = self.model(im_bs_scale, augment=self.augment_, visualize=self.visualize_)[0]  # (5,10647,6) tensor
-        pred_ori = self.model(im_one_scale, augment=self.augment_, visualize=self.visualize_)[0]  # (1,3276,6)   tensor
+        # (5,10647,6) tensor 4k
+        # (9,10647,6) tensor 8k
+        pred_bs = self.model(im_bs_scale, augment=self.augment_, visualize=self.visualize_)[0]
+        # (1,3276,6) tensor 4k
+        # (2,3276,6) tensor 8k
+        pred_ori = self.model(im_one_scale, augment=self.augment_, visualize=self.visualize_)[0]
 
         # NMS
         # on (n,6) tensor per image [xyxy, conf, cls]
-        pred_five = non_max_suppression(pred_five, conf_thres, iou_thres, classes, agnostic_nms,
-                                        max_det=max_det)  # [tensor([]),...,tensor((n,6)),(),()]  len =5
-        pred_ori = non_max_suppression(pred_ori, conf_thres, iou_thres, classes, agnostic_nms,
-                                       max_det=max_det)  # [tensor([]),...,tensor((n,6)),(),()]   len = 1
+        # [tensor([]),...,tensor((n,6)),(),()]  len =5 4k
+        # [tensor([]),...,tensor((n,6)),(),()]  len =9 8k
+        pred_bs = non_max_suppression(pred_bs, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        # [tensor([]),...,tensor((n,6)),(),()]   len = 1 4k
+        # [tensor([]),...,tensor((n,6)),(),()]   len = 2 8k
+        pred_ori = non_max_suppression(pred_ori, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
         #
-        pred_two = (pred_five, pred_ori)
+        pred_two = (pred_bs, pred_ori)
 
         # list of element tensor(1,6) for box
         one_result_for_img = []
-        five_result_for_img = []
+        bs_result_for_img = []
         # 首先进行坐标转换
         for i in range(len(pred_two)):
             preds = pred_two[i]
@@ -140,30 +147,34 @@ class YOLOInit(nn.Module):
                     pred_every_img[:, :4] = scale_coords(img_get_shape[i][-2:], pred_every_img[:, :4],
                                                          img_get_shape_ori[i][-2:]).round()
                     # 将切分图坐标转换至原始图像
-                    if preds_len > 1:
-                        pred_every_img[:, 0], pred_every_img[:, 2] = pred_every_img[:, 0] + j * split_stride, pred_every_img[:,
-                                                                                                     2] + j * split_stride
+                    if preds_len >= 4:
+                        pred_every_img[:, 0], pred_every_img[:, 2] = pred_every_img[:, 0] + j * split_stride, pred_every_img[:,2] + j * split_stride
                         for index in range(len(pred_every_img)):
-                            five_result_for_img.append(pred_every_img[index])
+                            bs_result_for_img.append(pred_every_img[index])
+                    elif preds_len==2:
+                        split_stride_ = img_get_shape_ori[i][-1]
+                        pred_every_img[:, 0], pred_every_img[:, 2] = pred_every_img[:, 0] + j * split_stride_, pred_every_img[:,2] + j * split_stride_
+                        for index in range(len(pred_every_img)):
+                            one_result_for_img.append(pred_every_img[index])
                     elif preds_len == 1:
                         for index in range(len(pred_every_img)):
                             one_result_for_img.append(pred_every_img[index])
 
         # margeBox
-        if len(five_result_for_img):
-            five_result_for_img = torch.vstack(five_result_for_img)
-            five_result_for_img = marge_box(five_result_for_img, self.names, iou_thresh=0.05, debug=False)
+        if len(bs_result_for_img):
+            bs_result_for_img = torch.vstack(bs_result_for_img)
+            bs_result_for_img = marge_box(bs_result_for_img, self.names, iou_thresh=0.05, debug=False)
         if len(one_result_for_img):
             one_result_for_img = torch.vstack(one_result_for_img)
 
-        if len(five_result_for_img) and not len(one_result_for_img):
-            nms_ = five_result_for_img
-        elif not len(five_result_for_img) and len(one_result_for_img):
+        if len(bs_result_for_img) and not len(one_result_for_img):
+            nms_ = bs_result_for_img
+        elif not len(bs_result_for_img) and len(one_result_for_img):
             nms_ = one_result_for_img
-        elif not len(five_result_for_img) and not len(one_result_for_img):
+        elif not len(bs_result_for_img) and not len(one_result_for_img):
             nms_ = []
         else:
-            nms_ = torch.vstack([one_result_for_img, five_result_for_img])
+            nms_ = torch.vstack([one_result_for_img, bs_result_for_img])
         # nms
         if len(nms_):
             nms_ = xyxy_img_nms(nms_, self.names, iou_thresh=0.05)
@@ -171,6 +182,9 @@ class YOLOInit(nn.Module):
         img_draw_ = img_draw.copy()
         img_split = cv2.cvtColor(img_draw, cv2.COLOR_RGB2GRAY)
         h_img_ori,w_img_ori = im_one_orin_shape[-2:]
+        if cam_resolution.lower() == '8k':
+            h_img_ori, w_img_ori = im_one_orin_shape[-2],im_one_orin_shape[-2]*2
+
         file_name, file_mat = os.path.basename(im_path).split('.')
         for i, box in enumerate(nms_):
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
@@ -234,8 +248,10 @@ class YOLOInit(nn.Module):
                 cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
                 cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
 
-        if not debug:
-            im_draw_path = './debug_result/images/'
+        if debug:
+            im_draw_path = './debug_result/images_4k/'
+            if cam_resolution == '8k':
+                im_draw_path = './debug_result/images_8k/'
             if not os.path.exists(im_draw_path):
                 os.makedirs(im_draw_path)
             file_name = os.path.basename(im_path)
