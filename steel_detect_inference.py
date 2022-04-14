@@ -129,7 +129,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             cv2.imwrite(path_save, img_roi)
         else:
             print(f'存储小图的队列暂时没有数据了,等待......................')
-            time.sleep(0.5)
+            time.sleep(0.1)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -144,7 +144,7 @@ def parse_opt():
     parser.add_argument('--edge-shift', type=float, default=0, help='left and right edge shift')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--cam_resolution',type=str, default='4k', help='camera resolution,use 4k 0r 8k')
+    parser.add_argument('--cam_resolution',type=str, default='8k', help='camera resolution,use 4k 0r 8k')
     parser.add_argument('--schema', type=int, default=1, help='Whether there is an algorithm test program')
     # parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
     # parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')

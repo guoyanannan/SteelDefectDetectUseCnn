@@ -117,7 +117,7 @@ def numpy_to_torch_tensor(img_arr,img_size,stride,auto,device):
 
 def remove_file(file_path,logger):
     is_remv = False
-    for i in range(10):
+    for i in range(3):
         try:
             os.remove(file_path)
             is_remv = True
@@ -373,8 +373,9 @@ def read_images(dirs_path, q, schema, log_path):
                         # file_name = os.path.basename(path)
                         dict_info = {'img_rgb':img_arr_rgb, 'img_path': path}
                         q.put(dict_info)
-                        remove_file(path,logger=logger)
+                        remove_file(path, logger=logger)
                 else:
+                    time.sleep(1)
                     logger.info(f'{dir_path}暂时没有数据了，等待新数据....................')
         else:
             # dir_path (path1,path2),几个相机写几个,地址需至包含 0 1目录

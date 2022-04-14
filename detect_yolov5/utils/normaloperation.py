@@ -232,10 +232,10 @@ class MultiprocessHandler(logging.FileHandler):
         dirName,log_file_name = os.path.split(self.baseFilename)
         fileNames = os.listdir(dirName)
         result = []
-        print('dirname:',dirName)
+        #print('dirname:',dirName)
         for fileName in fileNames:
             log_file_time = log_file_name.split('.')[0]
-            print('time:',log_file_time)
+            #print('time:',log_file_time)
             #匹配符合规则的日志文件，添加到result列表中
             if re.compile(self.extMath).match(log_file_time):
                 result.append(os.path.join(dirName,fileName))
