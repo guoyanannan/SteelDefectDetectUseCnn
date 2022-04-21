@@ -228,8 +228,14 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read)
     total_imgs = []
     for dir_path in dirs_path_:
         json_path = os.path.join(dir_path, 'record.json')
-        with open(json_path, 'r', encoding='utf-8') as f:
-            json_info = json.load(f)
+        while 1:
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    json_info = json.load(f)
+                    break
+            except:
+                time.sleep(0.01)
+                continue
         img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
         files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
         total_imgs += files
@@ -237,8 +243,14 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read)
     if len(total_imgs):
         for path in total_imgs:
             # 获取图片数组
-            _, file_mat = os.path.basename(path).split('.')
-            img_arr = np.array(Image.open(path), dtype=np.uint8)
+            _, file_mat = os.path.splitext(os.path.basename(path))
+            while 1:
+                try:
+                    img_arr = np.array(Image.open(path), dtype=np.uint8)
+                    break
+                except:
+                    time.sleep(0.01)
+                    continue
             img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
             img_h, img_w = img_arr_rgb.shape[:-1]
             # 获取当前图片信息
@@ -252,8 +264,7 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read)
             fy = (float(steel_end) - float(steel_start)) / img_h
             img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
                                  str(img_index), str(steel_left), str(steel_start),
-                                 str(fx), str(fy), 'H']) + f'.{file_mat}'
-            print(img_name)
+                                 str(fx), str(fy), 'H']) + str(file_mat)
             dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
             q_read.put(dict_info)
     else:

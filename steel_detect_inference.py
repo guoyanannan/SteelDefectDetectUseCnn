@@ -19,7 +19,7 @@ from detect_yolov5.utils.normaloperation import LOGS
 def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,log_path):
     logger = LOGS(log_path)
     model_obj.to(device)
-    currt_num = 1
+    currt_num = 0
     total_time = 0
     while 1:
         if not q.empty():
@@ -167,7 +167,7 @@ def parse_opt():
     parser.add_argument('--visualize', action='store_true', help='visualize features')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
-    parser.add_argument('--debug', action='store_true',default=True, help='use debug mode')
+    parser.add_argument('--debug', action='store_true',default=False, help='use debug mode')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args('detect', opt)

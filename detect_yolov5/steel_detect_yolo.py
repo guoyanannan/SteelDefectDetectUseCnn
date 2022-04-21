@@ -183,23 +183,23 @@ class YOLOInit(nn.Module):
         img_split = cv2.cvtColor(img_draw, cv2.COLOR_RGB2GRAY)
         h_img_ori,w_img_ori = im_one_orin_shape[-2:]
         if cam_resolution.lower() == '8k':
-            h_img_ori, w_img_ori = im_one_orin_shape[-2],im_one_orin_shape[-2]*2
+            h_img_ori, w_img_ori = im_one_orin_shape[-2],im_one_orin_shape[-1]*2
         file_name, file_mat = os.path.splitext(os.path.basename(im_path))
+
         for i, box in enumerate(nms_):
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
             # 越边界
             if x2 <= left_edge or x1 >= right_edge:
                 continue
             # 扩展ROI
-            x1_cut,y1_cut,x2_cut,y2_cut = x1-25, y1-25, x2+25, y2+25
 
+            x1_cut,y1_cut,x2_cut,y2_cut = x1-25, y1-25, x2+25, y2+25
             if x1_cut < 0:
                 x1_cut = 1
             if y1_cut < 0:
                 y1_cut = 1
             if x2_cut > w_img_ori:
                 x2_cut = w_img_ori-1
-
             if y2_cut > h_img_ori:
                 y2_cut = h_img_ori-1
 
@@ -217,17 +217,18 @@ class YOLOInit(nn.Module):
             if debug:
                 roi_file_name = '_'.join([file_name, str(i),
                                           str(x1), str(y1), str(x2), str(y2),
-                                          ]) + f'.{file_mat}'
+                                          ]) + str(file_mat)
             else:
                 flag_str,steel_no,camera_no,img_index,left_pos,top_pos,fx,fy,_ = file_name.split('_')
-                left_in_steel,top_in_steel = left_pos+x1*fx, top_pos+y1*fy
-                right_in_steel,bot_in_steel = right_in_steel+x2*fx, top_pos+y2*fy
+                left_in_steel,top_in_steel = float(left_pos)+x1*float(fx), float(top_pos)+y1*float(fy)
+                right_in_steel,bot_in_steel = float(left_pos)+x2*float(fx), float(top_pos)+y2*float(fy)
                 roi_file_name = '_'.join([str(flag_str), str(steel_no),str(camera_no),str(img_index),
                                           str(left_edge),str(right_edge),
-                                          str(x1), str(x2), str(y2), str(y2),
+                                          str(x1), str(x2), str(y1), str(y2),
                                           str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
                                           'H'
-                                          ]) + f'.{file_mat}'
+                                          ]) + str(file_mat)
+
             img_roi_info = {'data':img_roi,'name':roi_file_name}
             result_roi_q.put(img_roi_info)
             if debug:
@@ -246,7 +247,6 @@ class YOLOInit(nn.Module):
                 # 边界
                 cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
                 cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
-
         if debug:
             im_draw_path = './debug_result/images_4k/'
             if cam_resolution == '8k':
