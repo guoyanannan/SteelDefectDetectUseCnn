@@ -184,8 +184,7 @@ class YOLOInit(nn.Module):
         h_img_ori,w_img_ori = im_one_orin_shape[-2:]
         if cam_resolution.lower() == '8k':
             h_img_ori, w_img_ori = im_one_orin_shape[-2],im_one_orin_shape[-2]*2
-
-        file_name, file_mat = os.path.basename(im_path).split('.')
+        file_name, file_mat = os.path.splitext(os.path.basename(im_path))
         for i, box in enumerate(nms_):
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
             # 越边界

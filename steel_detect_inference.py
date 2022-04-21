@@ -96,10 +96,10 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     queue_list = [Queue(100),Queue(100),Queue(100)]
 
     read_pro = Process(target=read_images, args=(source,read_queue,schema,log_path))
-    select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, log_path))
     read_pro.start()
+    select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, log_path))
     select_edge_pro.start()
-
+    #
     pid_list += [read_pro,select_edge_pro]
     for i in range(len(queue_list)):
         q_get_info = queue_list[i]
@@ -148,7 +148,7 @@ def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='./weights/bests.pt', help='model path(s)')
     parser.add_argument('--log_path', type=str, default='./detect_logs', help='Directory where log files reside')
-    parser.add_argument('--rois_dir', type=str, default='./result_roi', help='Directory where log files reside')
+    parser.add_argument('--rois_dir', type=str, default='./result_roi_8k', help='Directory where log files reside')
     parser.add_argument('--dirs', type=tuple, default=(r'E:\detectsrc1',r'E:\detectsrc2'), help='image directory')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[416], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')

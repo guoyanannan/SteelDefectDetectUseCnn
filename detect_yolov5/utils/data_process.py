@@ -216,11 +216,64 @@ def get_input_tensor(img_arr,  # img RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
+def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read):
+
+    if is_up_seq:
+        seq_num = last_seq
+    else:
+        seq_num = curr_seq
+
+    dir_index = os.path.join(str(seq_num % 2), '2d'.upper())
+    dirs_path_ = [os.path.join(path_, dir_index) for path_ in sub_dirs]
+    total_imgs = []
+    for dir_path in dirs_path_:
+        json_path = os.path.join(dir_path, 'record.json')
+        with open(json_path, 'r', encoding='utf-8') as f:
+            json_info = json.load(f)
+        img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
+        files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
+        total_imgs += files
+        img_index_dict['imgIndex'][cam_no] = img_num
+    if len(total_imgs):
+        for path in total_imgs:
+            # 获取图片数组
+            _, file_mat = os.path.basename(path).split('.')
+            img_arr = np.array(Image.open(path), dtype=np.uint8)
+            img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
+            img_h, img_w = img_arr_rgb.shape[:-1]
+            # 获取当前图片信息
+            with open(path, 'ab+') as fp:
+                fp.seek(-292, 1)
+                res_ = fp.read(292)
+                res_info = eval(res_.split(b'\x00')[0].decode())
+            steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(
+                res_info.values())
+            fx = (float(steel_right) - float(steel_left)) / img_w
+            fy = (float(steel_end) - float(steel_start)) / img_h
+            img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
+                                 str(img_index), str(steel_left), str(steel_start),
+                                 str(fx), str(fy), 'H']) + f'.{file_mat}'
+            print(img_name)
+            dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
+            q_read.put(dict_info)
+    else:
+        cam_index_info = img_index_dict['imgIndex']
+        if is_up_seq:
+            print(f'{time.strftime("%Y-%m-%d %H:%M:%S")}>>>>>>>>流水号{last_seq}各相机号已处理{cam_index_info},准备处理当前{curr_seq}的数据....................')
+            for i in list(img_index_dict['imgIndex'].keys()):
+                img_index_dict['imgIndex'][i] = 0
+            last_seq = int(curr_seq)
+        else:
+            print(f'{time.strftime("%Y-%m-%d %H:%M:%S")}>>>>>>>>流水号{curr_seq}各相机号已处理{cam_index_info},暂时没有待处理数据，等待....................')
+            time.sleep(1)
+
+    return curr_seq,last_seq,img_index_dict
+
+
 def read_images(dirs_path, q, schema, log_path):
     try:
         logger = LOGS(log_path)
         curr_img_index = {'imgIndex':{'1': 0,'2': 0,'3':0,'4': 0,'5': 0,'6':0,'7': 0,'8': 0,'9':0,'10':0}}
-
         last_steel_no = -1
         db_op = DbMysqlOp(ip='localhost', user='root', psd='nercar', db_name='ncdcoldstrip')
         while True:
@@ -240,9 +293,12 @@ def read_images(dirs_path, q, schema, log_path):
                         time.sleep(1)
                         logger.info(f'{dir_path}暂时没有数据了，等待新数据....................')
             else:
+
                 sql = 'SELECT * FROM steelrecord ORDER BY ID DESC LIMIT 0,1'
                 curr_steel_no = db_op.ss_latest_one(sql)[1]
 
+                print('当前流水号：',curr_steel_no)
+                print('上一次流水号：',last_steel_no)
                 if int(curr_steel_no) != last_steel_no:
                     # process strat
                     if last_steel_no <0:
@@ -251,82 +307,12 @@ def read_images(dirs_path, q, schema, log_path):
                     # process other time
                     else:
                         time.sleep(0.5)
-                        dir_index = os.path.join(str(last_steel_no % 2), '2d'.upper())
-                        dirs_path_ = [os.path.join(path_, dir_index) for path_ in dirs_path]
-                        total_imgs = []
-                        for dir_path in dirs_path_:
-                            json_path = os.path.join(dir_path, 'record.json')
-                            with open(json_path, 'r', encoding='utf-8') as f:
-                                json_info = json.load(f)
-                            img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
-                            if curr_img_index['imgIndex'][cam_no] != img_num:
-                                files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(curr_img_index['imgIndex'][cam_no], img_num)]
-                                total_imgs += files
-                                curr_img_index['imgIndex'][cam_no] = img_num
-                        if len(total_imgs):
-                            for path in total_imgs:
-                                # 获取图片数组
-                                _, file_mat = os.path.basename(path).split('.')
-                                img_arr = np.array(Image.open(path), dtype=np.uint8)
-                                img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
-                                img_h, img_w = img_arr_rgb.shape[:-1]
-                                # 获取当前图片信息
-                                with open(path, 'ab+') as fp:
-                                    fp.seek(-292, 1)
-                                    res_ = fp.read(292)
-                                    res_info = eval(res_.split(b'\x00')[0].decode())
-                                steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(
-                                    res_info.values())
-                                fx = (float(steel_right) - float(steel_left)) / img_w
-                                fy = (float(steel_end) - float(steel_start)) / img_h
-                                img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
-                                                     str(img_index), str(steel_left), str(steel_start),
-                                                     str(fx), str(fy), 'H']) + f'.{file_mat}'
-                                dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
-                                q.put(dict_info)
-                        else:
-                            for i in list(curr_img_index['imgIndex'].keys()):
-                                curr_img_index['imgIndex'][i]=0
-                            last_steel_no = int(curr_steel_no)
+                        curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no, True, dirs_path,
+                                                                                        curr_img_index, q)
                 # 当前卷处理
                 else:
-                    dir_index = os.path.join(str(curr_steel_no % 2),'2d'.upper())
-                    dirs_path_ = [os.path.join(path_,dir_index) for path_ in dirs_path]
-                    total_imgs = []
-                    for dir_path in dirs_path_:
-                        json_path = os.path.join(dir_path,'record.json')
-                        with open(json_path,'r',encoding='utf-8') as f:
-                            json_info = json.load(f)
-                        img_num,cam_no = int(json_info['imgNum']),str(json_info['camNo'])
-                        files = [os.path.join(dir_path,f'{i+1}.bmp') for i in range(curr_img_index['imgIndex'][cam_no], img_num)]
-                        total_imgs += files
-                        curr_img_index['imgIndex'][cam_no]=img_num
-                    if len(total_imgs):
-                        for path in total_imgs:
-                            # 获取图片数组
-                            _, file_mat = os.path.basename(path).split('.')
-                            img_arr = np.array(Image.open(path), dtype=np.uint8)
-                            img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
-                            img_h, img_w = img_arr_rgb.shape[:-1]
-                            # 获取当前图片信息
-                            with open(path, 'ab+') as fp:
-                                fp.seek(-292, 1)
-                                res_ = fp.read(292)
-                                res_info = eval(res_.split(b'\x00')[0].decode())
-                            steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(
-                                res_info.values())
-                            fx = (float(steel_right) - float(steel_left)) / img_w
-                            fy = (float(steel_end) - float(steel_start)) / img_h
-                            img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
-                                                 str(img_index), str(steel_left), str(steel_start),
-                                                 str(fx), str(fy), 'H']) + f'.{file_mat}'
-                            dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
-                            q.put(dict_info)
-
-                    else:
-                        print(f'>>>>流水号{curr_steel_no}:暂时没有待处理数据，等待....................')
-                        time.sleep(0.5)
-
+                    curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no, False, dirs_path,
+                                                                                    curr_img_index, q)
 
     except Exception as E:
         print('E:',E)
@@ -339,22 +325,17 @@ def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
     logger = LOGS(log_path)
     index = 0
     while True:
-        if schema:
-            if not q.empty():
-                img_infos = q.get()
-                img_arr_rgb,img_path = img_infos['img_rgb'],img_infos['img_path']
-                l_e, r_e = select_edge(img_arr_rgb, edge_shift, bin_thres, cam_resolution=cam_res)
-                infos = {'img_rgb':img_arr_rgb,'img_path':img_path,'left_e':l_e, 'right_e':r_e}
-                q_index = index % len(q_list)
-                q_list[q_index].put(infos)
-                index += 1
-                if index > 10000:
-                    index = 0
-
-            else:
-                time.sleep(0.01)
-                print(f'数据队列暂时没有新数据，等待....................')
-
+        if not q.empty():
+            img_infos = q.get()
+            img_arr_rgb,img_path = img_infos['img_rgb'],img_infos['img_path']
+            l_e, r_e = select_edge(img_arr_rgb, edge_shift, bin_thres, cam_resolution=cam_res)
+            infos = {'img_rgb':img_arr_rgb,'img_path':img_path,'left_e':l_e, 'right_e':r_e}
+            q_index = index % len(q_list)
+            q_list[q_index].put(infos)
+            index += 1
+            if index > 10000:
+                index = 0
 
         else:
-            pass
+            time.sleep(0.01)
+            print(f'数据队列暂时没有新数据，等待....................')

@@ -28,6 +28,7 @@ class DbMysqlOp:
         try:
             self.cur.execute(str(sql))
             one_result = self.cur.fetchone()
+            self.conn.commit()
             return one_result
         except Exception as E:
             self.close_()
@@ -36,6 +37,7 @@ class DbMysqlOp:
     def ss_bs(self,sql):
         try:
             bs_result = self.cur.execute(str(sql)).fetchall()
+            self.conn.commit()
             return bs_result
         except Exception as E:
             self.close_()
