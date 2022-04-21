@@ -4,6 +4,7 @@ Run inference on steel images
 """
 import argparse
 import os.path
+import signal
 import cv2
 import torch
 import time
@@ -82,8 +83,10 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         debug=False,  # debug mode
         ):
 
+    pid_list = []
     source = dirs
     logger_ = LOGS(log_path)
+
     model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path,augment_=augment,visualize_=visualize, dnn=dnn)
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
@@ -91,11 +94,13 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     read_queue = Queue(500)
     roi_q = Queue()
     queue_list = [Queue(100),Queue(100),Queue(100)]
+
     read_pro = Process(target=read_images, args=(source,read_queue,schema,log_path))
     select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, log_path))
     read_pro.start()
     select_edge_pro.start()
 
+    pid_list += [read_pro,select_edge_pro]
     for i in range(len(queue_list)):
         q_get_info = queue_list[i]
         run_pro = Process(target=data_tensor_infer,
@@ -117,9 +122,17 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                                 )
                           )
         run_pro.start()
+        pid_list.append(run_pro)
         logger_.info(f'process {i} starting success ')
     print('开始时间：', time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()))
+
     while 1:
+        for pip in pid_list:
+            if not pip.is_alive():
+                for pip_kill in pid_list:
+                    pip_kill.terminate()
+                os.kill(os.getpid(), signal.SIGINT)
+
         if not roi_q.empty():
             roi_infos = roi_q.get()
             img_roi,img_name = tuple(roi_infos.values())
@@ -136,7 +149,7 @@ def parse_opt():
     parser.add_argument('--weights', nargs='+', type=str, default='./weights/bests.pt', help='model path(s)')
     parser.add_argument('--log_path', type=str, default='./detect_logs', help='Directory where log files reside')
     parser.add_argument('--rois_dir', type=str, default='./result_roi', help='Directory where log files reside')
-    parser.add_argument('--dirs', type=tuple, default=('data/images',), help='image directory')
+    parser.add_argument('--dirs', type=tuple, default=(r'E:\detectsrc1',r'E:\detectsrc2'), help='image directory')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[416], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
@@ -145,7 +158,7 @@ def parse_opt():
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--cam_resolution',type=str, default='8k', help='camera resolution,use 4k 0r 8k')
-    parser.add_argument('--schema', type=int, default=1, help='Whether there is an algorithm test program')
+    parser.add_argument('--schema', type=int, default=0, help='Whether there is an algorithm test program')
     # parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
     # parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')

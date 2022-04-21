@@ -1,12 +1,14 @@
+import os
 import os.path
 import cv2
 import glob
 import torch
 import time
+import json
 import numpy as np
 from PIL import Image
 from .normaloperation import LOGS
-
+from .db_mysql import DbMysqlOp
 
 IMG_FORMATS = 'bmp', 'jpeg', 'jpg',  'png'
 
@@ -129,149 +131,6 @@ def remove_file(file_path,logger):
         logger.info(f'{file_path} deletion failed and the next loop will be entered')
 
 
-# def load_images(dir_path_list,
-#                 logger,
-#                 read_queue_list,
-#                 device,
-#                 img_size=416,
-#                 stride=64,
-#                 cam_resolution='4k',
-#                 auto=True,
-#                 schema=True,  # 有无算法测试程序
-#                 ):
-#
-#     for dir_path in dir_path_list:
-#         if os.path.exists(dir_path):
-#             continue
-#         else:
-#             logger.info(f'{dir_path} is does not exist. Please check!')
-#             raise Exception()
-#
-#     while True:
-#         img_path_list = []
-#         if schema:
-#             get_img_list_1 = time.time()
-#             for dir_path in dir_path_list:
-#                 files = sorted(glob.glob(os.path.join(dir_path, '*.*')))  # dir
-#                 images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
-#                 img_path_list += images
-#             get_img_list_2 = time.time()
-#
-#             print(f'数据列表整合阶段:{get_img_list_2-get_img_list_1}s')
-#             if len(img_path_list):
-#                 for i in range(len(img_path_list)):
-#                     start_get_img_1 = time.time()
-#                     path_img = img_path_list[i]
-#                     img_ori = cv2.imread(path_img)  # BGR HWC
-#                     img_draw = img_ori.copy()
-#                     img_split = img_ori.copy()
-#                     end_get_img_1 = time.time()
-#                     print(f'数据读取时间和copy时间:{end_get_img_1-start_get_img_1}s')
-#                     if cam_resolution.lower() == '4k'.lower():
-#                         # 寻边
-#                         start_select_edge = time.time()
-#                         left_edge,right_edge = select_edge(path_img, -10, 0.35, cam_resolution=cam_resolution)
-#                         end_select_edge = time.time()
-#                         print(f'寻边界：{end_select_edge-start_select_edge}s')
-#
-#                         procee_data_time_1 = time.time()
-#                         # 原图 - 1张 - 原始形状 - bchw
-#                         img_ori_one_shape = (1,img_ori.shape[-1],img_ori.shape[0],img_ori.shape[1])
-#                         # 原图 - 1张 - 缩放形态 - bchw
-#                         img_ori_one_scale_tensor = numpy_to_torch_tensor(img_ori,img_size,stride,auto,device)
-#
-#                         # 对于4k图像来说，不会切分两张，在此是为了和8k的统一加入队列的标准
-#                         # 原图 - 2张 - 原始形状 - bchw
-#                         img_cut_two_shape = img_ori_one_shape
-#                         # 原图 - 2张 - 缩放形态 - bchw
-#                         img_cut_two_scale_tensor = img_ori_one_scale_tensor
-#
-#                         # 切图
-#                         win_stride = 768
-#                         flag_temp = True
-#                         img_cut_list = []
-#                         img_cut_ori = []
-#                         for r in range(0, (img_split.shape[0] - img_split.shape[0]) + 1, win_stride):  # H方向进行切分
-#                             for c in range(0, (img_split.shape[1] - 1024) + 1, win_stride):  # W方向进行切分
-#                                 tmp = img_split[r: r + img_split.shape[0], c: c + 1024]
-#                                 # 切图 - 原始形状 - bchw
-#                                 if flag_temp:
-#                                     img_cut_bs_shape_ = (1,tmp.shape[-1],tmp.shape[0],tmp.shape[1])
-#                                     img_cut_ori.append(img_cut_bs_shape_)
-#                                     flag_temp = False
-#                                 # 切图 - 缩放形态 - bchw
-#                                 img_cut_one_scale_tensor = numpy_to_torch_tensor(tmp,img_size,stride,auto,device)
-#                                 img_cut_list.append(img_cut_one_scale_tensor)
-#
-#                         img_cut_bs_scale_tensor = torch.cat(img_cut_list,dim=0)
-#                         img_cut_bs_shape = img_cut_ori[0]
-#
-#                         procee_data_time_2 = time.time()
-#                         print(f'数据规整时间：{procee_data_time_2-procee_data_time_1}')
-#                     if cam_resolution.lower() == '8k'.lower():
-#                         # 寻边
-#                         left_edge, right_edge = select_edge(path_img, -10, 0.35, cam_resolution=cam_resolution)
-#
-#                         # 原图 - 1张 - 原始形状 - bchw
-#                         img_ori_one_shape = (1, img_ori.shape[-1], img_ori.shape[0], img_ori.shape[1])
-#                         # 原图 - 1张 - 缩放形态 - bchw
-#                         img_ori_one_scale_tensor = numpy_to_torch_tensor(img_ori, img_size, stride, auto, device)
-#
-#                         # 原图 - 2张 - 原始形状 - bchw
-#                         img_cut_two_shape = (2, img_ori.shape[-1], img_ori.shape[0], img_ori.shape[1]//2)
-#                         # 原图 - 2张 - 缩放形态 - bchw
-#                         img_two_list = []
-#                         img_cut_two_scale_tensor_1 = numpy_to_torch_tensor(img_ori[:, :img_ori.shape[1]//2], img_size, stride, auto, device)
-#                         img_cut_two_scale_tensor_2 = numpy_to_torch_tensor(img_ori[:, img_ori.shape[1]//2:], img_size, stride, auto, device)
-#                         img_two_list +=[img_cut_two_scale_tensor_1,img_cut_two_scale_tensor_2]
-#                         img_cut_two_scale_tensor = torch.cat(img_two_list,dim=0)
-#                         # 切图
-#                         win_stride = 896
-#                         flag_temp = True
-#                         img_cut_list = []
-#                         img_cut_ori = []
-#                         for r in range(0, (img_split.shape[0] - img_split.shape[0]) + 1, win_stride):  # H方向进行切分
-#                             for c in range(0, (img_split.shape[1] - 1024) + 1, win_stride):  # W方向进行切分
-#                                 tmp = img_split[r: r + img_split.shape[0], c: c + 1024]
-#                                 # 切图 - 原始形状 - bchw
-#                                 if flag_temp:
-#                                     img_cut_bs_shape_ = (1, tmp.shape[-1], tmp.shape[0], tmp.shape[1])
-#                                     img_cut_ori.append(img_cut_bs_shape_)
-#                                     flag_temp = False
-#                                 # 切图 - 缩放形态 - bchw
-#                                 img_cut_one_scale_tensor = numpy_to_torch_tensor(tmp, img_size, stride, auto, device)
-#                                 img_cut_list.append(img_cut_one_scale_tensor)
-#
-#                         img_cut_bs_scale_tensor = torch.cat(img_cut_list)
-#                         img_cut_bs_shape = img_cut_ori[0]
-#
-#                     dict_inf0 = {'img_path': path_img,
-#                                  'img_draw': img_draw,
-#                                  'left_edge': left_edge,
-#                                  'right_edge': right_edge,
-#                                  'img_ori_one_shape': img_ori_one_shape,
-#                                  'img_ori_one_scale_tensor': img_ori_one_scale_tensor,
-#                                  'img_cut_two_shape': img_cut_two_shape,
-#                                  'img_cut_two_scale_tensor': img_cut_two_scale_tensor,
-#                                  'img_cut_bs_shape': img_cut_bs_shape,
-#                                  'img_cut_bs_scale_tensor': img_cut_bs_scale_tensor,
-#                                  'cam_resolution': cam_resolution.lower(),
-#                                  }
-#                     queue_num = len(read_queue_list)
-#                     queue_index = i % queue_num
-#                     if read_queue_list[queue_index].full() is False:
-#                         read_queue_list[queue_index].put(dict_inf0)
-#                         # 添加完成后进行删除
-#                         remove_file(path_img,logger=logger)
-#                     else:
-#                         logger.info(f'data_queue_{queue_index+1} is full,image add failed and he next loop will be entered!')
-#
-#             else:
-#                 logger.info('The current folder is empty, waiting for a new image to be written！')
-#                 time.sleep(2)
-#                 continue
-
-
 def get_input_tensor(img_arr,  # img RGB
                cam_resolution,  # 相机分辨率
                img_size,  # 期望尺寸 [h,w]
@@ -358,34 +217,122 @@ def get_input_tensor(img_arr,  # img RGB
 
 
 def read_images(dirs_path, q, schema, log_path):
-    logger = LOGS(log_path)
-    curr_seq = 0
-    last_seq = -100
-    while True:
-        if schema:
-            for dir_path in dirs_path:
-                files = sorted(glob.glob(os.path.join(dir_path, '*.*')))
-                images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
-                if len(images):
-                    for path in images:
-                        img_arr = np.array(Image.open(path), dtype=np.uint8)
-                        img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
-                        # file_name = os.path.basename(path)
-                        dict_info = {'img_rgb':img_arr_rgb, 'img_path': path}
-                        q.put(dict_info)
-                        remove_file(path, logger=logger)
+    try:
+        logger = LOGS(log_path)
+        curr_img_index = {'imgIndex':{'1': 0,'2': 0,'3':0,'4': 0,'5': 0,'6':0,'7': 0,'8': 0,'9':0,'10':0}}
+
+        last_steel_no = -1
+        db_op = DbMysqlOp(ip='localhost', user='root', psd='nercar', db_name='ncdcoldstrip')
+        while True:
+            if schema:
+                for dir_path in dirs_path:
+                    files = sorted(glob.glob(os.path.join(dir_path, '*.*')))
+                    images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
+                    if len(images):
+                        for path in images:
+                            img_arr = np.array(Image.open(path), dtype=np.uint8)
+                            img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
+                            # file_name = os.path.basename(path)
+                            dict_info = {'img_rgb':img_arr_rgb, 'img_path': path}
+                            q.put(dict_info)
+                            remove_file(path, logger=logger)
+                    else:
+                        time.sleep(1)
+                        logger.info(f'{dir_path}暂时没有数据了，等待新数据....................')
+            else:
+                sql = 'SELECT * FROM steelrecord ORDER BY ID DESC LIMIT 0,1'
+                curr_steel_no = db_op.ss_latest_one(sql)[1]
+
+                if int(curr_steel_no) != last_steel_no:
+                    # process strat
+                    if last_steel_no <0:
+                        last_steel_no = int(curr_steel_no)
+
+                    # process other time
+                    else:
+                        time.sleep(0.5)
+                        dir_index = os.path.join(str(last_steel_no % 2), '2d'.upper())
+                        dirs_path_ = [os.path.join(path_, dir_index) for path_ in dirs_path]
+                        total_imgs = []
+                        for dir_path in dirs_path_:
+                            json_path = os.path.join(dir_path, 'record.json')
+                            with open(json_path, 'r', encoding='utf-8') as f:
+                                json_info = json.load(f)
+                            img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
+                            if curr_img_index['imgIndex'][cam_no] != img_num:
+                                files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(curr_img_index['imgIndex'][cam_no], img_num)]
+                                total_imgs += files
+                                curr_img_index['imgIndex'][cam_no] = img_num
+                        if len(total_imgs):
+                            for path in total_imgs:
+                                # 获取图片数组
+                                _, file_mat = os.path.basename(path).split('.')
+                                img_arr = np.array(Image.open(path), dtype=np.uint8)
+                                img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
+                                img_h, img_w = img_arr_rgb.shape[:-1]
+                                # 获取当前图片信息
+                                with open(path, 'ab+') as fp:
+                                    fp.seek(-292, 1)
+                                    res_ = fp.read(292)
+                                    res_info = eval(res_.split(b'\x00')[0].decode())
+                                steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(
+                                    res_info.values())
+                                fx = (float(steel_right) - float(steel_left)) / img_w
+                                fy = (float(steel_end) - float(steel_start)) / img_h
+                                img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
+                                                     str(img_index), str(steel_left), str(steel_start),
+                                                     str(fx), str(fy), 'H']) + f'.{file_mat}'
+                                dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
+                                q.put(dict_info)
+                        else:
+                            for i in list(curr_img_index['imgIndex'].keys()):
+                                curr_img_index['imgIndex'][i]=0
+                            last_steel_no = int(curr_steel_no)
+                # 当前卷处理
                 else:
-                    time.sleep(1)
-                    logger.info(f'{dir_path}暂时没有数据了，等待新数据....................')
-        else:
-            # dir_path (path1,path2),几个相机写几个,地址需至包含 0 1目录
-            # 读物info.json文件获取当前流水号，图像数量
-            # 如果当前流水号 != 上一次流水号：循环图像读取，结束后上一次流水号=当前流水号
+                    dir_index = os.path.join(str(curr_steel_no % 2),'2d'.upper())
+                    dirs_path_ = [os.path.join(path_,dir_index) for path_ in dirs_path]
+                    total_imgs = []
+                    for dir_path in dirs_path_:
+                        json_path = os.path.join(dir_path,'record.json')
+                        with open(json_path,'r',encoding='utf-8') as f:
+                            json_info = json.load(f)
+                        img_num,cam_no = int(json_info['imgNum']),str(json_info['camNo'])
+                        files = [os.path.join(dir_path,f'{i+1}.bmp') for i in range(curr_img_index['imgIndex'][cam_no], img_num)]
+                        total_imgs += files
+                        curr_img_index['imgIndex'][cam_no]=img_num
+                    if len(total_imgs):
+                        for path in total_imgs:
+                            # 获取图片数组
+                            _, file_mat = os.path.basename(path).split('.')
+                            img_arr = np.array(Image.open(path), dtype=np.uint8)
+                            img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
+                            img_h, img_w = img_arr_rgb.shape[:-1]
+                            # 获取当前图片信息
+                            with open(path, 'ab+') as fp:
+                                fp.seek(-292, 1)
+                                res_ = fp.read(292)
+                                res_info = eval(res_.split(b'\x00')[0].decode())
+                            steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(
+                                res_info.values())
+                            fx = (float(steel_right) - float(steel_left)) / img_w
+                            fy = (float(steel_end) - float(steel_start)) / img_h
+                            img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
+                                                 str(img_index), str(steel_left), str(steel_start),
+                                                 str(fx), str(fy), 'H']) + f'.{file_mat}'
+                            dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
+                            q.put(dict_info)
 
-            # 读取图片里信息，获得 top bottom left right 真实坐标，换算fx，fy，
+                    else:
+                        print(f'>>>>流水号{curr_steel_no}:暂时没有待处理数据，等待....................')
+                        time.sleep(0.5)
 
-            #
-            pass
+
+    except Exception as E:
+        print('E:',E)
+        db_op.close_()
+        logger.info(f'{E}')
+        raise E
 
 
 def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
