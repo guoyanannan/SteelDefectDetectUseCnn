@@ -192,7 +192,6 @@ class YOLOInit(nn.Module):
             if x2 <= left_edge or x1 >= right_edge:
                 continue
             # 扩展ROI
-
             x1_cut,y1_cut,x2_cut,y2_cut = x1-25, y1-25, x2+25, y2+25
             if x1_cut < 0:
                 x1_cut = 1
@@ -289,4 +288,4 @@ class YOLOInit(nn.Module):
 
 if __name__ == '__main__':
     my_log = LOGS('./detect_logs')
-    YOLOInit(0,'0',0,my_log)
+    YOLOInit(0, '0', 0, my_log)

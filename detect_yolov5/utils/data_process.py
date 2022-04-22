@@ -7,7 +7,7 @@ import time
 import json
 import numpy as np
 from PIL import Image
-from .normaloperation import LOGS
+from .normaloperation import LOGS,re_print
 from .db_mysql import DbMysqlOp
 
 IMG_FORMATS = 'bmp', 'jpeg', 'jpg',  'png'
@@ -216,7 +216,7 @@ def get_input_tensor(img_arr,  # img RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
-def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read):
+def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,log_oper):
 
     if is_up_seq:
         seq_num = last_seq
@@ -270,12 +270,12 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read)
     else:
         cam_index_info = img_index_dict['imgIndex']
         if is_up_seq:
-            print(f'{time.strftime("%Y-%m-%d %H:%M:%S")}>>>>>>>>流水号{last_seq}各相机号已处理{cam_index_info},准备处理当前{curr_seq}的数据....................')
+            log_oper.info(f'流水号{last_seq}各相机图像{cam_index_info}已处理完成,开始处理流水号为{curr_seq}的图像')
             for i in list(img_index_dict['imgIndex'].keys()):
                 img_index_dict['imgIndex'][i] = 0
             last_seq = int(curr_seq)
         else:
-            print(f'{time.strftime("%Y-%m-%d %H:%M:%S")}>>>>>>>>流水号{curr_seq}各相机号已处理{cam_index_info},暂时没有待处理数据，等待....................')
+            re_print(f'流水号{curr_seq}各相机号图像{cam_index_info}已读取完成,暂时没有待读取图像，等待')
             time.sleep(1)
 
     return curr_seq,last_seq,img_index_dict
@@ -283,10 +283,11 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read)
 
 def read_images(dirs_path, q, schema, log_path):
     try:
-        logger = LOGS(log_path)
-        curr_img_index = {'imgIndex':{'1': 0,'2': 0,'3':0,'4': 0,'5': 0,'6':0,'7': 0,'8': 0,'9':0,'10':0}}
+        logger_ = LOGS(log_path)
+        curr_img_index = {'imgIndex': {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0}}
         last_steel_no = -1
-        db_op = DbMysqlOp(ip='localhost', user='root', psd='nercar', db_name='ncdcoldstrip')
+        if not schema:
+            db_op = DbMysqlOp(ip='localhost', user='root', psd='nercar', db_name='ncdcoldstrip')
         while True:
             if schema:
                 for dir_path in dirs_path:
@@ -299,54 +300,107 @@ def read_images(dirs_path, q, schema, log_path):
                             # file_name = os.path.basename(path)
                             dict_info = {'img_rgb':img_arr_rgb, 'img_path': path}
                             q.put(dict_info)
-                            remove_file(path, logger=logger)
+                            remove_file(path, logger=logger_)
                     else:
                         time.sleep(1)
-                        logger.info(f'{dir_path}暂时没有数据了，等待新数据....................')
+                        re_print(f'{dir_path}暂时没有数据了，等待新数据')
             else:
 
                 sql = 'SELECT * FROM steelrecord ORDER BY ID DESC LIMIT 0,1'
                 curr_steel_no = db_op.ss_latest_one(sql)[1]
-
-                print('当前流水号：',curr_steel_no)
-                print('上一次流水号：',last_steel_no)
                 if int(curr_steel_no) != last_steel_no:
                     # process strat
                     if last_steel_no <0:
                         last_steel_no = int(curr_steel_no)
-
                     # process other time
                     else:
                         time.sleep(0.5)
-                        curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no, True, dirs_path,
-                                                                                        curr_img_index, q)
+                        curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
+                                                                                        True, dirs_path,
+                                                                                        curr_img_index, q, logger_)
                 # 当前卷处理
                 else:
-                    curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no, False, dirs_path,
-                                                                                    curr_img_index, q)
+                    curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
+                                                                                    False, dirs_path,
+                                                                                    curr_img_index, q, logger_)
 
     except Exception as E:
-        print('E:',E)
         db_op.close_()
-        logger.info(f'{E}')
+        logger_.info(f'{E}')
         raise E
 
 
 def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
-    logger = LOGS(log_path)
-    index = 0
-    while True:
-        if not q.empty():
-            img_infos = q.get()
-            img_arr_rgb,img_path = img_infos['img_rgb'],img_infos['img_path']
-            l_e, r_e = select_edge(img_arr_rgb, edge_shift, bin_thres, cam_resolution=cam_res)
-            infos = {'img_rgb':img_arr_rgb,'img_path':img_path,'left_e':l_e, 'right_e':r_e}
-            q_index = index % len(q_list)
-            q_list[q_index].put(infos)
-            index += 1
-            if index > 10000:
-                index = 0
+    try:
+        logger_ = LOGS(log_path)
+        index = 0
+        while True:
+            if not q.empty():
+                img_infos = q.get()
+                img_arr_rgb,img_path = img_infos['img_rgb'],img_infos['img_path']
+                l_e, r_e = select_edge(img_arr_rgb, edge_shift, bin_thres, cam_resolution=cam_res)
+                infos = {'img_rgb':img_arr_rgb,'img_path':img_path,'left_e':l_e, 'right_e':r_e}
+                q_index = index % len(q_list)
+                q_list[q_index].put(infos)
+                index += 1
+                if index > 10000:
+                    index = 0
 
-        else:
-            time.sleep(0.01)
-            print(f'数据队列暂时没有新数据，等待....................')
+    except Exception as E:
+        logger_.info(f'{E}')
+        raise E
+
+
+# (img_arr_rgb, cam_resolution, imgsz, stride, device, pt,......)
+def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,log_path):
+    try:
+        logger_ = LOGS(log_path)
+        model_obj.to(device)
+        currt_num = 0
+        total_time = 0
+        last_seq = -1
+        while 1:
+            if not q.empty():
+                start_time = time.time()
+                img_infos = q.get()
+                img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
+                img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
+                    = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto)
+                model_obj.pre_process_detect(img_path,
+                                             result_roi_q,
+                                             left_eg,
+                                             right_eg,
+                                             img_arr_rgb,
+                                             img_cut_bs_scale_tensor,
+                                             img_cut_bs_shape,
+                                             img_ori_one_scale_tensor,
+                                             img_ori_one_shape,
+                                             img_cut_two_scale_tensor,
+                                             img_cut_two_shape,
+                                             conf_thres,
+                                             iou_thres,
+                                             classes,
+                                             agnostic_nms,
+                                             max_det,
+                                             cam_resolution,
+                                             debug=debug,
+                                            )
+                end_time = time.time()
+                currt_num += 1
+                total_time += end_time-start_time
+                if not debug:
+                    curr_seq = img_path.split('_')[1]
+                    re_print(f'process-{os.getpid()} 已处理流水号为{curr_seq}的{currt_num}张图片,平均耗时{total_time / currt_num}s')
+                    if int(curr_seq) != last_seq:
+                        currt_num = 0
+                        total_time = 0
+                        last_seq = int(curr_seq)
+                else:
+                    re_print(f'process-{os.getpid()} 已处理{currt_num}张图片,平均耗时{total_time / currt_num}s')
+                    if currt_num > int(1e6):
+                        currt_num =0
+                        total_time = 0
+
+    except Exception as E:
+        logger_.info(E)
+        raise E

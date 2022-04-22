@@ -9,55 +9,10 @@ import cv2
 import torch
 import time
 from multiprocessing import Process, Queue
-from detect_yolov5.utils.data_process import get_input_tensor,read_images,get_steel_edge
+from detect_yolov5.utils.data_process import data_tensor_infer,read_images,get_steel_edge
 from detect_yolov5.utils.general import check_img_size, print_args
 from detect_yolov5.steel_detect_yolo import YOLOInit
-from detect_yolov5.utils.normaloperation import LOGS
-
-
-#(img_arr_rgb, cam_resolution, imgsz, stride, device, pt)
-def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,log_path):
-    logger = LOGS(log_path)
-    model_obj.to(device)
-    currt_num = 0
-    total_time = 0
-    while 1:
-        if not q.empty():
-            start_time = time.time()
-            img_infos = q.get()
-            img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
-            img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
-                = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto)
-            model_obj.pre_process_detect(img_path,
-                                         result_roi_q,
-                                         left_eg,
-                                         right_eg,
-                                         img_arr_rgb,
-                                         img_cut_bs_scale_tensor,
-                                         img_cut_bs_shape,
-                                         img_ori_one_scale_tensor,
-                                         img_ori_one_shape,
-                                         img_cut_two_scale_tensor,
-                                         img_cut_two_shape,
-                                         conf_thres,
-                                         iou_thres,
-                                         classes,
-                                         agnostic_nms,
-                                         max_det,
-                                         cam_resolution,
-                                         debug=debug,
-                                        )
-            end_time = time.time()
-            currt_num += 1
-            total_time += end_time-start_time
-            print(f'process-{os.getpid()}:处理了{currt_num}张图片,平均耗时{total_time/currt_num}s')
-            if currt_num > 100000:
-                logger.info(f'process-{os.getpid()}:处理了{currt_num}张图片,平均耗时{total_time / currt_num}s')
-                currt_num = 0
-                total_time = 0
-        else:
-            print(f'>>>>>>>>>>>>>>>>warning>>>>>>>>>>>>>>>:process-{os.getpid()}:算法处理速度快于图像前处理>>>>>>>>>')
-            time.sleep(0.5)
+from detect_yolov5.utils.normaloperation import LOGS,re_print
 
 
 @torch.no_grad()
@@ -85,22 +40,30 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
 
     pid_list = []
     source = dirs
-    logger_ = LOGS(log_path)
-
-    model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path,augment_=augment,visualize_=visualize, dnn=dnn)
+    # logger_ = LOGS(log_path)
+    model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize,
+                     dnn=dnn)
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
-    print(source,stride, names, pt, device,imgsz)
+    some_info = f'图像路径:{source} 显卡索引{device} 图像缩放尺寸{imgsz}'
+    model.log_op.info(some_info)
+    # read image q
     read_queue = Queue(500)
+    # roi sets q
     roi_q = Queue()
-    queue_list = [Queue(100),Queue(100),Queue(100)]
-
-    read_pro = Process(target=read_images, args=(source,read_queue,schema,log_path))
-    read_pro.start()
-    select_edge_pro = Process(target=get_steel_edge, args=(read_queue,queue_list,schema,edge_shift,bin_thres, cam_resolution, log_path))
-    select_edge_pro.start()
+    # q required for Detection
+    queue_list = [Queue(100), Queue(100), Queue(100)]
     #
+    read_pro = Process(target=read_images, args=(source, read_queue, schema, log_path))
+    read_pro.start()
+    model.log_op.info(f'process-{read_pro.pid} starting success')
+    select_edge_pro = Process(target=get_steel_edge,
+                              args=(read_queue, queue_list, schema, edge_shift, bin_thres, cam_resolution, log_path))
+    select_edge_pro.start()
+    model.log_op.info(f'process-{select_edge_pro.pid} starting success')
+    # pid number list
     pid_list += [read_pro,select_edge_pro]
+
     for i in range(len(queue_list)):
         q_get_info = queue_list[i]
         run_pro = Process(target=data_tensor_infer,
@@ -123,10 +86,10 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                           )
         run_pro.start()
         pid_list.append(run_pro)
-        logger_.info(f'process {i} starting success ')
-    print('开始时间：', time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime()))
+        model.log_op.info(f'process-{run_pro.pid} starting success')
 
     while 1:
+        # if a process fails, kill them all
         for pip in pid_list:
             if not pip.is_alive():
                 for pip_kill in pid_list:
@@ -141,7 +104,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             path_save = os.path.join(rois_dir, img_name)
             cv2.imwrite(path_save, img_roi)
         else:
-            print(f'存储小图的队列暂时没有数据了,等待......................')
+            re_print(f'缺陷数据队列中暂时没有了,等待')
             time.sleep(0.1)
 
 def parse_opt():

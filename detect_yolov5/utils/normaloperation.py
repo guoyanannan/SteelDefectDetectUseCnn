@@ -5,12 +5,17 @@ import logging
 import platform
 import torch
 import datetime
+import time
 from torchvision.ops import nms
 
 try:
     import codecs
 except ImportError:
     codecs = None
+
+
+def re_print(info):
+    print(f'{time.strftime("%Y-%m-%d %H:%M:%S")} {info}....................')
 
 
 def xyxy_img_nms(boxes,classnames,iou_thresh):
@@ -134,6 +139,7 @@ def select_device(device, log_op, batch_size=0, newline=True):
     log_op.info(s.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else s)  # emoji-safe
 
     return torch.device('cuda:0' if cuda else 'cpu')
+
 
 class MultiprocessHandler(logging.FileHandler):
     """支持多进程的TimedRotatingFileHandler"""
@@ -260,6 +266,7 @@ class MultiprocessHandler(logging.FileHandler):
             raise
         except:
             self.handleError(record)
+
 
 class LOGS(object):
     def __init__(self, dir_path, when='D',record_num=0):
