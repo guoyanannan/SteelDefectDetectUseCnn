@@ -44,64 +44,69 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         debug=False,  # debug mode
         ):
+
+    pid_list = []
+    source = dirs
+    # logger_ = LOGS(log_path)
     try:
-        pid_list = []
-        source = dirs
-        # logger_ = LOGS(log_path)
         model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize,
                          dnn=dnn)
-        stride, names, pt, device = model.stride, model.names, model.pt,model.device
-        imgsz = check_img_size(imgsz, s=stride)  # check image size
-        some_info = f'图像路径:{source} 显卡索引{device} 图像缩放尺寸{imgsz}'
-        model.log_op.info(some_info)
-        # read image q
-        read_queue = Queue(500)
-        # roi sets q
-        roi_q = Queue()
-        # q required for Detection
-        queue_list=[]
-        for i in range(pro_num):
-            queue_list.append(Queue(100))
-        #
-        read_pro = Process(target=read_images, args=(source, read_queue, schema, log_path))
-        read_pro.start()
-        model.log_op.info(f'process-{read_pro.pid} starting success')
-        select_edge_pro = Process(target=get_steel_edge,
-                                  args=(read_queue, queue_list, schema, edge_shift, bin_thres, cam_resolution, log_path))
-        select_edge_pro.start()
-        model.log_op.info(f'process-{select_edge_pro.pid} starting success')
-        # pid number list
-        pid_list += [read_pro,select_edge_pro]
+    except Exception as E:
+        re_print(E)
+        raise E
+    stride, names, pt, device = model.stride, model.names, model.pt,model.device
+    imgsz = check_img_size(imgsz, s=stride)  # check image size
+    some_info = f'图像路径:{source} 显卡索引{device} 图像缩放尺寸{imgsz}'
+    model.log_op.info(some_info)
+    # read image q
+    read_queue = Queue(500)
+    # roi sets q
+    roi_q = Queue()
+    # q required for Detection
+    queue_list=[]
+    for i in range(pro_num):
+        queue_list.append(Queue(100))
+    #
+    read_pro = Process(target=read_images, args=(source, read_queue, schema, log_path))
+    read_pro.start()
+    model.log_op.info(f'process-{read_pro.pid} starting success')
+    select_edge_pro = Process(target=get_steel_edge,
+                              args=(read_queue, queue_list, schema, edge_shift, bin_thres, cam_resolution, log_path))
+    select_edge_pro.start()
+    model.log_op.info(f'process-{select_edge_pro.pid} starting success')
+    # pid number list
+    pid_list += [read_pro,select_edge_pro]
 
-        for i in range(len(queue_list)):
-            q_get_info = queue_list[i]
-            run_pro = Process(target=data_tensor_infer,
-                              args=(q_get_info,
-                                    roi_q,
-                                    model,
-                                    cam_resolution,
-                                    imgsz,
-                                    stride,
-                                    device,
-                                    pt,
-                                    conf_thres,
-                                    iou_thres,
-                                    classes,
-                                    agnostic_nms,
-                                    max_det,
-                                    half,
-                                    debug,
-                                    log_path
-                                    )
-                              )
-            run_pro.start()
-            pid_list.append(run_pro)
-            model.log_op.info(f'process-{run_pro.pid} starting success')
+    for i in range(len(queue_list)):
+        q_get_info = queue_list[i]
+        run_pro = Process(target=data_tensor_infer,
+                          args=(q_get_info,
+                                roi_q,
+                                model,
+                                cam_resolution,
+                                imgsz,
+                                stride,
+                                device,
+                                pt,
+                                conf_thres,
+                                iou_thres,
+                                classes,
+                                agnostic_nms,
+                                max_det,
+                                half,
+                                debug,
+                                log_path
+                                )
+                          )
+        run_pro.start()
+        pid_list.append(run_pro)
+        model.log_op.info(f'process-{run_pro.pid} starting success')
 
-        # delete temp files
-        del_thread = Thread(target=delete_temp, args=(r'C:\Users\{}\AppData\Local\Temp'.format(os.getlogin()),))
-        del_thread.start()
-        while 1:
+    # delete temp files
+    del_thread = Thread(target=delete_temp, args=(r'C:\Users\{}\AppData\Local\Temp'.format(os.getlogin()),))
+    del_thread.start()
+    while 1:
+        try:
             # if a process fails, kill them all
             for pip in pid_list:
                 if not pip.is_alive():
@@ -119,9 +124,14 @@ def run(
             else:
                 re_print(f'缺陷数据队列中暂时没有了,等待')
                 time.sleep(0.1)
-    except Exception as E:
-        model.log_op.info(E)
-        raise E
+        except Exception as E:
+            model.log_op.info(E)
+            for pip in pid_list:
+                if pip.is_alive():
+                    for pip_kill in pid_list:
+                        pip_kill.terminate()
+                    os.kill(os.getpid(), signal.SIGINT)
+
 
 def parse_opt():
     print(os.path.abspath(__file__))
