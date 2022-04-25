@@ -1,0 +1,32 @@
+# defect detect config
+detect:
+  filePath:
+    weights: './weights/bests.pt'
+    logs: './detect_logs'
+    rois: './result_roi_8k'
+    srcs:
+      - E:\detectsrc1
+      - E:\detectsrc2
+  
+  dbInfo:
+    db_ip: '127.0.0.1'
+    db_user: 'root'
+    db_psd: 'nercar'
+    db_name: 'ncdcoldstrip'
+
+  infoParameter:
+    img_size: 416
+    conf_thres: 0.25
+    iou_thres: 0.45
+    bin_thres: 0.35
+    edge_shift: 0
+    max_det: 1000
+    pro_num: 3
+    # 'cuda device, i.e. 0 or 0,1,2,3 or cpu'
+    device: '0'
+    cam_res: '8k'
+    schema: 0
+    half: False
+    dnn: False
+    debug: False
+# defect recognition config

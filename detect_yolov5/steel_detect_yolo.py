@@ -12,6 +12,7 @@ ROOT = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(ROOT)
 
 
+
 class YOLOInit(nn.Module):
 
     def __init__(self, weights, gpu_cpu, half, log_path,augment_,visualize_ ,dnn=False):
@@ -52,7 +53,7 @@ class YOLOInit(nn.Module):
             session = onnxruntime.InferenceSession(w, providers=providers)
         self.__dict__.update(locals())
 
-    def forward(self, im,val=False):
+    def forward(self, im, val=False):
         # YOLOv5 MultiBackend inference
         b, ch, h, w = im.shape  # batch, channel, height, width
         if self.pt or self.jit:  # PyTorch
@@ -61,7 +62,7 @@ class YOLOInit(nn.Module):
         elif self.dnn:  # ONNX OpenCV DNN
             im = im.cpu().numpy()  # torch to numpy
             self.net.setInput(im)
-            if self.device.type !='cpu':
+            if self.device.type != 'cpu':
                 self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
                 self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
             y = self.net.forward()
@@ -89,8 +90,8 @@ class YOLOInit(nn.Module):
                            im_bs_ori_shape,  # 形状可选(bs,c,h,w)or(c,h,w)or(h,w)
                            im_one_scale,  # 数组形状(1,c,h,w)
                            im_one_orin_shape,  # 形状可选(1,c,h,w)or(c,h,w)or(h,w)
-                           im_two_scale,  # 数组形状(1,c,h,w)
-                           im_two_orin_shape,  # 形状可选(1,c,h,w)or(c,h,w)or(h,w)
+                           im_two_scale,  # 数组形状(2,c,h,w)
+                           im_two_orin_shape,  # 形状可选(2,c,h,w)or(c,h,w)or(h,w)
                            conf_thres,
                            iou_thres,
                            classes,
@@ -111,12 +112,13 @@ class YOLOInit(nn.Module):
             split_stride = 896
             im_one_scale = im_two_scale
             im_one_orin_shape = im_two_orin_shape
-
+        # input node data size
         img_get_shape = (im_bs_scale.shape, im_one_scale.shape)
+        # scale previous data size
         img_get_shape_ori = (im_bs_ori_shape, im_one_orin_shape)
         # (5,10647,6) tensor 4k
         # (9,10647,6) tensor 8k
-        pred_bs = self.model(im_bs_scale, augment=self.augment_, visualize=self.visualize_)[0]
+        pred_bs = self.model(im_bs_scale,augment=self.augment_, visualize=self.visualize_)[0]
         # (1,3276,6) tensor 4k
         # (2,3276,6) tensor 8k
         pred_ori = self.model(im_one_scale, augment=self.augment_, visualize=self.visualize_)[0]

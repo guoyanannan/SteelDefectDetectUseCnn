@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import shutil
 import logging
 import platform
 import torch
@@ -13,6 +14,28 @@ try:
 except ImportError:
     codecs = None
 
+
+def delete_temp(path):
+    temp_path = path
+    while 1:
+        for file in os.listdir(temp_path):
+            file_path = os.path.join(temp_path, file)
+            # print(file_path)
+            if '_MEI' in file_path:
+                try:
+                    shutil.rmtree(file_path)
+                except Exception as E:
+                    # print(E)
+                    time.sleep(30)
+                    pass
+
+            if file.split('.')[-1] in ('log', 'py', 'dll'):
+                try:
+                    os.remove(file_path)
+                except Exception as E:
+                    # print(E)
+                    time.sleep(30)
+                    pass
 
 def re_print(info):
     print(f'{time.strftime("%Y-%m-%d %H:%M:%S")} {info}....................')

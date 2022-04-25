@@ -5,6 +5,7 @@ import glob
 import torch
 import time
 import json
+import yaml
 import numpy as np
 from PIL import Image
 from .normaloperation import LOGS,re_print
@@ -103,12 +104,12 @@ def select_edge(img_arr,shift,bin_threshold=0.35,cam_resolution='4k',debug=False
     return edge_select(img_th,img_rgb,w_scale,shift)
 
 
-def numpy_to_torch_tensor(img_arr,img_size,stride,auto,device):
+def numpy_to_torch_tensor(img_arr,img_size,stride,auto,device,half):
     img_arr = letterbox(img_arr, img_size, stride, auto=auto)[0]
     img_arr = img_arr.transpose((2, 0, 1))
     img_arr = np.ascontiguousarray(img_arr)
     img_arr = torch.from_numpy(img_arr).to(device)
-    img_arr = img_arr.float()
+    img_arr = img_arr.half() if half else img_arr.float()
     img_arr /= 255
     if len(img_arr.shape) == 3:
         img_bs_scale = img_arr[None]
@@ -137,6 +138,7 @@ def get_input_tensor(img_arr,  # img RGB
                stride,    # 网络最终下采样倍数
                device,    # str cuda:0 or 1 or 2,  or str cpu
                auto,
+               fp16,
                bin_threshold=0.35,  #
                ):
 
@@ -146,7 +148,7 @@ def get_input_tensor(img_arr,  # img RGB
         # 原图 - 1张 - 原始形状 - bchw
         img_ori_one_shape = (1, img_ori.shape[-1], img_ori.shape[0], img_ori.shape[1])
         # 原图 - 1张 - 缩放形态 - bchw
-        img_ori_one_scale_tensor = numpy_to_torch_tensor(img_ori, img_size, stride, auto, device)
+        img_ori_one_scale_tensor = numpy_to_torch_tensor(img_ori, img_size, stride, auto, device, fp16)
 
         # 对于4k图像来说，不会切分两张，在此是为了和8k的统一加入队列的标准
         # 原图 - 2张 - 原始形状 - bchw
@@ -168,7 +170,7 @@ def get_input_tensor(img_arr,  # img RGB
                     img_cut_ori.append(img_cut_bs_shape_)
                     flag_temp = False
                 # 切图 - 缩放形态 - bchw
-                img_cut_one_scale_tensor = numpy_to_torch_tensor(tmp, img_size, stride, auto, device)
+                img_cut_one_scale_tensor = numpy_to_torch_tensor(tmp, img_size, stride, auto, device, fp16)
                 img_cut_list.append(img_cut_one_scale_tensor)
 
         img_cut_bs_scale_tensor = torch.cat(img_cut_list, dim=0)
@@ -178,16 +180,16 @@ def get_input_tensor(img_arr,  # img RGB
         # 原图 - 1张 - 原始形状 - bchw
         img_ori_one_shape = (1, img_ori.shape[-1], img_ori.shape[0], img_ori.shape[1])
         # 原图 - 1张 - 缩放形态 - bchw
-        img_ori_one_scale_tensor = numpy_to_torch_tensor(img_ori, img_size, stride, auto, device)
+        img_ori_one_scale_tensor = numpy_to_torch_tensor(img_ori, img_size, stride, auto, device, fp16)
 
         # 原图 - 2张 - 原始形状 - bchw
         img_cut_two_shape = (2, img_ori.shape[-1], img_ori.shape[0], img_ori.shape[1] // 2)
         # 原图 - 2张 - 缩放形态 - bchw
         img_two_list = []
         img_cut_two_scale_tensor_1 = numpy_to_torch_tensor(img_ori[:, :img_ori.shape[1] // 2], img_size, stride, auto,
-                                                           device)
+                                                           device, fp16)
         img_cut_two_scale_tensor_2 = numpy_to_torch_tensor(img_ori[:, img_ori.shape[1] // 2:], img_size, stride, auto,
-                                                           device)
+                                                           device, fp16)
         img_two_list += [img_cut_two_scale_tensor_1, img_cut_two_scale_tensor_2]
         img_cut_two_scale_tensor = torch.cat(img_two_list, dim=0)
         # 切图
@@ -204,7 +206,7 @@ def get_input_tensor(img_arr,  # img RGB
                     img_cut_ori.append(img_cut_bs_shape_)
                     flag_temp = False
                 # 切图 - 缩放形态 - bchw
-                img_cut_one_scale_tensor = numpy_to_torch_tensor(tmp, img_size, stride, auto, device)
+                img_cut_one_scale_tensor = numpy_to_torch_tensor(tmp, img_size, stride, auto, device, fp16)
                 img_cut_list.append(img_cut_one_scale_tensor)
 
         img_cut_bs_scale_tensor = torch.cat(img_cut_list)
@@ -233,8 +235,9 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                 with open(json_path, 'r', encoding='utf-8') as f:
                     json_info = json.load(f)
                     break
-            except:
+            except Exception as E:
                 time.sleep(0.01)
+                re_print(E)
                 continue
         img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
         files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
@@ -248,18 +251,26 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                 try:
                     img_arr = np.array(Image.open(path), dtype=np.uint8)
                     break
-                except:
+                except Exception as E:
                     time.sleep(0.01)
+                    re_print(E)
                     continue
             img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
             img_h, img_w = img_arr_rgb.shape[:-1]
-            # 获取当前图片信息
-            with open(path, 'ab+') as fp:
-                fp.seek(-292, 1)
-                res_ = fp.read(292)
-                res_info = eval(res_.split(b'\x00')[0].decode())
-            steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(
-                res_info.values())
+            while 1:
+                try:
+                    # 获取图像相关信息
+                    with open(path, 'ab+') as fp:
+                        fp.seek(-292, 1)
+                        res_ = fp.read(292)
+                        res_info = eval(res_.split(b'\x00')[0].decode())
+                    steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(res_info.values())
+                    break
+                except Exception as E:
+                    time.sleep(0.01)
+                    re_print(E)
+                    continue
+            # 解析数据
             fx = (float(steel_right) - float(steel_left)) / img_w
             fy = (float(steel_end) - float(steel_start)) / img_h
             img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
@@ -283,11 +294,15 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
 
 def read_images(dirs_path, q, schema, log_path):
     try:
+        with open('config.yaml', 'r', encoding='utf-8') as f:
+            cg = yaml.load(f.read(), Loader=yaml.FullLoader)
+        db_config = cg['detect']['dbInfo']
         logger_ = LOGS(log_path)
         curr_img_index = {'imgIndex': {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0}}
         last_steel_no = -1
         if not schema:
-            db_op = DbMysqlOp(ip='localhost', user='root', psd='nercar', db_name='ncdcoldstrip')
+            db_op = DbMysqlOp(ip=db_config['db_ip'], user=db_config['db_user'], psd=db_config['db_psd'],
+                              db_name=db_config['db_name'])
         while True:
             if schema:
                 for dir_path in dirs_path:
@@ -307,7 +322,12 @@ def read_images(dirs_path, q, schema, log_path):
             else:
 
                 sql = 'SELECT * FROM steelrecord ORDER BY ID DESC LIMIT 0,1'
-                curr_steel_no = db_op.ss_latest_one(sql)[1]
+                curr_steel_no = db_op.ss_latest_one(sql)
+                if curr_steel_no is None:
+                    re_print('未检索到任何卷号记录，请检查系统是否正常运行')
+                    time.sleep(5)
+                else:
+                    curr_steel_no = curr_steel_no[1]
                 if int(curr_steel_no) != last_steel_no:
                     # process strat
                     if last_steel_no <0:
@@ -320,6 +340,7 @@ def read_images(dirs_path, q, schema, log_path):
                                                                                         curr_img_index, q, logger_)
                 # 当前卷处理
                 else:
+                    time.sleep(0.5)
                     curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                     False, dirs_path,
                                                                                     curr_img_index, q, logger_)
@@ -345,14 +366,13 @@ def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
                 index += 1
                 if index > 10000:
                     index = 0
-
     except Exception as E:
         logger_.info(f'{E}')
         raise E
 
 
 # (img_arr_rgb, cam_resolution, imgsz, stride, device, pt,......)
-def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,debug,log_path):
+def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,fp16,debug,log_path):
     try:
         logger_ = LOGS(log_path)
         model_obj.to(device)
@@ -365,7 +385,7 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
                 img_infos = q.get()
                 img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
                 img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
-                    = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto)
+                    = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto,fp16)
                 model_obj.pre_process_detect(img_path,
                                              result_roi_q,
                                              left_eg,
