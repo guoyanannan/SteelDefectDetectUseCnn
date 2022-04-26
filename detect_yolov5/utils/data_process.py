@@ -46,7 +46,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     return im, ratio, (dw, dh)
 
 
-def edge_select(img_src, img_rgb,radio,shift,debug=False):
+def edge_select(img_src, radio, shift):
     h,w = img_src.shape
     select_rows = [int(h*1/32),int(h*8/32),int(h*16/32),int(h*24/32),int(h*31/32)]
     select_rows = np.array(select_rows,dtype=np.uint)
@@ -76,17 +76,10 @@ def edge_select(img_src, img_rgb,radio,shift,debug=False):
         left_edge=0
     if right_edge > radio * w:
         right_edge = radio * w
-    if debug:
-        cv2.line(img_rgb,(left_edge,0),(left_edge,img_rgb.shape[0]-1),(255,0,0),3)
-        cv2.line(img_rgb,(right_edge,0),(right_edge,img_rgb.shape[0]-1),(255,0,0),3)
-        cv2.namedWindow('edge',0)
-        cv2.imshow('edge',img_rgb)
     return left_edge,right_edge
 
 
-def select_edge(img_arr,shift,bin_threshold=0.35,cam_resolution='4k',debug=False):
-    img_rgb = img_arr.copy()  # RGB
-    img_arr = cv2.cvtColor(img_arr,cv2.COLOR_RGB2GRAY)
+def select_edge(img_arr,shift,bin_threshold=0.35,cam_resolution='4k'):
     img = cv2.medianBlur(img_arr, 5)
     if cam_resolution.lower() == '4k'.lower():
         h_scale,w_scale = 4, 4
@@ -98,10 +91,7 @@ def select_edge(img_arr,shift,bin_threshold=0.35,cam_resolution='4k',debug=False
     img_right = img[:, img.shape[1] // 2:]
     max_mean = max(cv2.mean(img_left)[0], cv2.mean(img_right)[0])
     _, img_th = cv2.threshold(img, max_mean * bin_threshold, 255, 0)
-    if debug:
-        cv2.namedWindow('img2threshold',0)
-        cv2.imshow('img2threshold', img_th)
-    return edge_select(img_th,img_rgb,w_scale,shift)
+    return edge_select(img_th,w_scale,shift)
 
 
 def numpy_to_torch_tensor(img_arr,img_size,stride,auto,device,half):
@@ -132,7 +122,7 @@ def remove_file(file_path,logger):
         logger.info(f'{file_path} deletion failed and the next loop will be entered')
 
 
-def get_input_tensor(img_arr,  # img RGB
+def get_input_tensor(img_arr,  # RGB
                cam_resolution,  # 相机分辨率
                img_size,  # 期望尺寸 [h,w]
                stride,    # 网络最终下采样倍数
@@ -143,7 +133,7 @@ def get_input_tensor(img_arr,  # img RGB
                ):
 
     img_ori = img_arr  # RGB
-    img_split = img_arr.copy()
+    img_split = img_arr
     if cam_resolution.lower() == '4k'.lower():
         # 原图 - 1张 - 原始形状 - bchw
         img_ori_one_shape = (1, img_ori.shape[-1], img_ori.shape[0], img_ori.shape[1])
@@ -218,7 +208,7 @@ def get_input_tensor(img_arr,  # img RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
-def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,log_oper):
+def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,shift,bin_th,cam_res,log_oper):
 
     if is_up_seq:
         seq_num = last_seq
@@ -246,15 +236,18 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
         for path in total_imgs:
             # 获取图片数组
             _, file_mat = os.path.splitext(os.path.basename(path))
+            # read images
+            t1 = time.time()
             while 1:
                 try:
-                    img_arr = np.array(Image.open(path), dtype=np.uint8)
+                    img_arr = cv2.imread(path,0)
+                    img_h, img_w = img_arr.shape
+                    l_e, r_e = select_edge(img_arr, shift, bin_th, cam_res)
                     break
                 except Exception as E:
                     re_print(E)
                     continue
-            img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
-            img_h, img_w = img_arr_rgb.shape[:-1]
+            # read infos of images
             while 1:
                 try:
                     # 获取图像相关信息
@@ -267,13 +260,15 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                 except Exception as E:
                     re_print(E)
                     continue
+            t2 = time.time()
+            re_print(f'读取图像+判断边部时间：{t2 - t1}')
             # 解析数据
             fx = (float(steel_right) - float(steel_left)) / img_w
             fy = (float(steel_end) - float(steel_start)) / img_h
             img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
                                  str(img_index), str(steel_left), str(steel_start),
                                  str(fx), str(fy), 'H']) + str(file_mat)
-            dict_info = {'img_rgb': img_arr_rgb, 'img_path': img_name}
+            dict_info = {'img_gray': img_arr, 'img_path': img_name, 'left_e':l_e, 'right_e':r_e}
             q_read.put(dict_info)
     else:
         cam_index_info = img_index_dict['imgIndex']
@@ -289,7 +284,7 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
     return curr_seq,last_seq,img_index_dict
 
 
-def read_images(dirs_path, q, schema, log_path):
+def read_images(dirs_path, q, schema, edge_shift, bin_thres, cam_res, log_path):
     try:
         with open('config.yaml', 'r', encoding='utf-8') as f:
             cg = yaml.load(f.read(), Loader=yaml.FullLoader)
@@ -307,10 +302,9 @@ def read_images(dirs_path, q, schema, log_path):
                     images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
                     if len(images):
                         for path in images:
-                            img_arr = np.array(Image.open(path), dtype=np.uint8)
-                            img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
-                            # file_name = os.path.basename(path)
-                            dict_info = {'img_rgb':img_arr_rgb, 'img_path': path}
+                            img_arr = cv2.imread(path,0)
+                            l_e,r_e= select_edge(img_arr,edge_shift,bin_thres,cam_res)
+                            dict_info = {'img_gray':img_arr, 'img_path': path, 'left_e':l_e, 'right_e':r_e}
                             q.put(dict_info)
                             remove_file(path, logger=logger_)
                     else:
@@ -321,7 +315,7 @@ def read_images(dirs_path, q, schema, log_path):
                 sql = 'SELECT * FROM steelrecord ORDER BY ID DESC LIMIT 0,1'
                 curr_steel_no = db_op.ss_latest_one(sql)
                 if curr_steel_no is None:
-                    re_print('未检索到任何卷号记录，请检查系统是否正常运行')
+                    re_print('未检索到任何卷号记录，请检查采集系统是否正常运行')
                     time.sleep(5)
                 else:
                     curr_steel_no = curr_steel_no[1]
@@ -333,12 +327,16 @@ def read_images(dirs_path, q, schema, log_path):
                     else:
                         curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                         True, dirs_path,
-                                                                                        curr_img_index, q, logger_)
+                                                                                        curr_img_index, q,
+                                                                                        edge_shift, bin_thres, cam_res,
+                                                                                        logger_)
                 # 当前卷处理
                 else:
                     curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                     False, dirs_path,
-                                                                                    curr_img_index, q, logger_)
+                                                                                    curr_img_index, q,
+                                                                                    edge_shift, bin_thres, cam_res,
+                                                                                    logger_)
 
     except Exception as E:
         db_op.close_()
@@ -379,6 +377,10 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
                 start_time = time.time()
                 img_infos = q.get()
                 img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
+                if len(img_arr_rgb.shape) == 2:
+                    img_arr_rgb = cv2.cvtColor(img_arr_rgb,cv2.COLOR_GRAY2RGB)
+                elif len(img_arr_rgb.shape) < 2:
+                    raise Exception()
                 img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
                     = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto,fp16)
                 model_obj.pre_process_detect(img_path,
@@ -415,6 +417,10 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
                     if currt_num > int(1e6):
                         currt_num =0
                         total_time = 0
+            else:
+                if debug:
+                    re_print(f'process-{os.getpid()}暂时无处理数据,算法处理速度快于图像前处理速度')
+
 
     except Exception as E:
         logger_.info(E)

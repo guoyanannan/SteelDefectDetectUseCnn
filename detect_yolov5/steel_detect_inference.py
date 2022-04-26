@@ -47,7 +47,6 @@ def run(
 
     pid_list = []
     source = dirs
-    # logger_ = LOGS(log_path)
     try:
         model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize,
                          dnn=dnn)
@@ -59,29 +58,19 @@ def run(
     some_info = f'图像路径:{source} 显卡索引{device} 图像缩放尺寸{imgsz}'
     model.log_op.info(some_info)
     # read image q
-    read_queue = Queue(500)
-    # roi sets q
-    roi_q = Queue()
-    # q required for Detection
-    queue_list=[]
-    for i in range(pro_num):
-        queue_list.append(Queue(100))
-    #
-    read_pro = Process(target=read_images, args=(source, read_queue, schema, log_path))
+    read_queue = Queue(600)
+    # roi image q
+    roi_queue = Queue()
+
+    read_pro = Process(target=read_images, args=(source, read_queue, schema, edge_shift,bin_thres,cam_resolution,log_path))
     read_pro.start()
     model.log_op.info(f'process-{read_pro.pid} starting success')
-    select_edge_pro = Process(target=get_steel_edge,
-                              args=(read_queue, queue_list, schema, edge_shift, bin_thres, cam_resolution, log_path))
-    select_edge_pro.start()
-    model.log_op.info(f'process-{select_edge_pro.pid} starting success')
-    # pid number list
-    pid_list += [read_pro,select_edge_pro]
+    pid_list += [read_pro]
 
-    for i in range(len(queue_list)):
-        q_get_info = queue_list[i]
+    for i in range(pro_num):
         run_pro = Process(target=data_tensor_infer,
-                          args=(q_get_info,
-                                roi_q,
+                          args=(read_queue,
+                                roi_queue,
                                 model,
                                 cam_resolution,
                                 imgsz,
@@ -114,8 +103,8 @@ def run(
                         pip_kill.terminate()
                     os.kill(os.getpid(), signal.SIGINT)
 
-            if not roi_q.empty():
-                roi_infos = roi_q.get()
+            if not roi_queue.empty():
+                roi_infos = roi_queue.get()
                 img_roi,img_name = tuple(roi_infos.values())
                 if not os.path.exists(rois_dir):
                     os.makedirs(rois_dir)
