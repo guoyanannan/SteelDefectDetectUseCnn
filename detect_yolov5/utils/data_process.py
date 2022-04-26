@@ -236,7 +236,6 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                     json_info = json.load(f)
                     break
             except Exception as E:
-                time.sleep(0.01)
                 re_print(E)
                 continue
         img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
@@ -252,7 +251,6 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                     img_arr = np.array(Image.open(path), dtype=np.uint8)
                     break
                 except Exception as E:
-                    time.sleep(0.01)
                     re_print(E)
                     continue
             img_arr_rgb = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2RGB)
@@ -267,7 +265,6 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                     steel_no_bmp, img_index, cam_no_bmp, steel_start, steel_end, steel_left, steel_right = tuple(res_info.values())
                     break
                 except Exception as E:
-                    time.sleep(0.01)
                     re_print(E)
                     continue
             # 解析数据
@@ -334,13 +331,11 @@ def read_images(dirs_path, q, schema, log_path):
                         last_steel_no = int(curr_steel_no)
                     # process other time
                     else:
-                        time.sleep(0.5)
                         curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                         True, dirs_path,
                                                                                         curr_img_index, q, logger_)
                 # 当前卷处理
                 else:
-                    time.sleep(0.5)
                     curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                     False, dirs_path,
                                                                                     curr_img_index, q, logger_)
