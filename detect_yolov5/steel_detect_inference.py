@@ -27,6 +27,7 @@ def run(
         dirs=('data/images',),
         rois_dir='./result_roi',
         imgsz=(640, 640),
+        num_loop=0,
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         bin_thres=0.35,
@@ -55,14 +56,15 @@ def run(
         raise E
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
-    some_info = f'图像路径:{source} 显卡索引{device} 图像缩放尺寸{imgsz}'
+    some_info = f'图像路径:{source} 显卡索引:{device} 图像缩放尺寸:{imgsz} 循环数量:{num_loop}'
     model.log_op.info(some_info)
+
     # read image q
     read_queue = Queue(600)
     # roi image q
     roi_queue = Queue()
 
-    read_pro = Process(target=read_images, args=(source, read_queue, schema, edge_shift,bin_thres,cam_resolution,log_path))
+    read_pro = Process(target=read_images, args=(source, read_queue, schema, num_loop,edge_shift,bin_thres,cam_resolution,log_path))
     read_pro.start()
     model.log_op.info(f'process-{read_pro.pid} starting success')
     pid_list += [read_pro]
@@ -123,7 +125,6 @@ def run(
 
 
 def parse_opt():
-    print(os.path.abspath(__file__))
     with open('config.yaml', 'r', encoding='utf-8') as f:
         cg = yaml.load(f.read(), Loader=yaml.FullLoader)
     detect_config = cg['detect']
@@ -131,8 +132,9 @@ def parse_opt():
     parser.add_argument('--weights', nargs='+', type=str, default=detect_config['filePath']['weights'], help='model path(s)')
     parser.add_argument('--log_path', type=str, default=detect_config['filePath']['logs'], help='Directory where log files reside')
     parser.add_argument('--rois_dir', type=str, default=detect_config['filePath']['rois'], help='Directory where roi images reside')
-    parser.add_argument('--dirs', type=tuple, default=tuple(detect_config['filePath']['srcs']), help='image directory')
+    parser.add_argument('--dirs', type=tuple, default=tuple(filter(None,detect_config['filePath']['srcs'])), help='image directory')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[detect_config['infoParameter']['img_size']], help='inference size h,w')
+    parser.add_argument('--num_loop', type=int, default=detect_config['infoParameter']['loop'],help='the number of save steel images')
     parser.add_argument('--conf-thres', type=float, default=detect_config['infoParameter']['conf_thres'], help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=detect_config['infoParameter']['iou_thres'], help='NMS IoU threshold')
     parser.add_argument('--bin-thres', type=float, default=detect_config['infoParameter']['bin_thres'], help='image binaryzation threshold')

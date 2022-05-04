@@ -208,14 +208,15 @@ def get_input_tensor(img_arr,  # RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
-def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,shift,bin_th,cam_res,log_oper):
+def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,shift,bin_th,cam_res,loop_no,log_oper):
 
     if is_up_seq:
         seq_num = last_seq
     else:
         seq_num = curr_seq
 
-    dir_index = os.path.join(str(seq_num % 2), '2d'.upper())
+    dir_num = len(sub_dirs)
+    dir_index = os.path.join(str(seq_num % dir_num), '2d'.upper())
     dirs_path_ = [os.path.join(path_, dir_index) for path_ in sub_dirs]
     total_imgs = []
     for dir_path in dirs_path_:
@@ -229,7 +230,10 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
                 re_print(E)
                 continue
         img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
-        files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
+        if not loop_no:
+            files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
+        else:
+            files = [os.path.join(dir_path, f'{(i + 1) % int(loop_no)}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
         total_imgs += files
         img_index_dict['imgIndex'][cam_no] = img_num
     if len(total_imgs):
@@ -284,7 +288,7 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
     return curr_seq,last_seq,img_index_dict
 
 
-def read_images(dirs_path, q, schema, edge_shift, bin_thres, cam_res, log_path):
+def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, log_path):
     try:
         with open('config.yaml', 'r', encoding='utf-8') as f:
             cg = yaml.load(f.read(), Loader=yaml.FullLoader)
@@ -329,17 +333,20 @@ def read_images(dirs_path, q, schema, edge_shift, bin_thres, cam_res, log_path):
                                                                                         True, dirs_path,
                                                                                         curr_img_index, q,
                                                                                         edge_shift, bin_thres, cam_res,
-                                                                                        logger_)
+                                                                                        loop_num,logger_)
                 # 当前卷处理
                 else:
                     curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                     False, dirs_path,
                                                                                     curr_img_index, q,
                                                                                     edge_shift, bin_thres, cam_res,
-                                                                                    logger_)
+                                                                                    loop_num,logger_)
 
     except Exception as E:
-        db_op.close_()
+        try:
+            db_op.close_()
+        except:
+            pass
         logger_.info(f'{E}')
         raise E
 

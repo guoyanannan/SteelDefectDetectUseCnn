@@ -5,8 +5,9 @@ detect:
     logs: './detect_logs'
     rois: './result_roi_8k'
     srcs:
-      - E:\work\SteelDefectDetectUseCnn\data\images_long
-      # - E:\detectsrc2
+      - E:\detectsrc1
+      - E:\detectsrc2
+      -
   
   dbInfo:
     db_ip: '127.0.0.1'
@@ -22,10 +23,13 @@ detect:
     edge_shift: 0
     max_det: 1000
     pro_num: 3
+    # 0表示存储所有图像
+    # >0 表示对此取余进行覆盖存储图像
+    loop: 0
     # 'cuda device, i.e. 0 or 0,1,2,3 or cpu'
     device: '0'
     cam_res: '8k'
-    schema: 1
+    schema: 0
     half: False
     dnn: False
     debug: True
