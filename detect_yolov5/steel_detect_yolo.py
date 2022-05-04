@@ -165,7 +165,7 @@ class YOLOInit(nn.Module):
         # margeBox
         if len(bs_result_for_img):
             bs_result_for_img = torch.vstack(bs_result_for_img)
-            bs_result_for_img = marge_box(bs_result_for_img, self.names, iou_thresh=0.05, debug=False)
+            bs_result_for_img = marge_box(bs_result_for_img, self.names, iou_thresh=0.005, debug=False)
         if len(one_result_for_img):
             one_result_for_img = torch.vstack(one_result_for_img)
 

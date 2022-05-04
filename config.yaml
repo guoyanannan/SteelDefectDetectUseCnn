@@ -5,8 +5,8 @@ detect:
     logs: './detect_logs'
     rois: './result_roi_8k'
     srcs:
-      - E:\detectsrc1
-      - E:\detectsrc2
+      - E:\work\SteelDefectDetectUseCnn\data\images_long
+      # - E:\detectsrc2
   
   dbInfo:
     db_ip: '127.0.0.1'
@@ -25,8 +25,8 @@ detect:
     # 'cuda device, i.e. 0 or 0,1,2,3 or cpu'
     device: '0'
     cam_res: '8k'
-    schema: 0
+    schema: 1
     half: False
     dnn: False
-    debug: False
+    debug: True
 # defect recognition config
