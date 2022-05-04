@@ -208,7 +208,7 @@ def get_input_tensor(img_arr,  # RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
-def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,shift,bin_th,cam_res,loop_no,log_oper):
+def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,shift,bin_th,cam_res,loop_no,log_oper,cold_start):
 
     if is_up_seq:
         seq_num = last_seq
@@ -220,6 +220,7 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
     dirs_path_ = [os.path.join(path_, dir_index) for path_ in sub_dirs]
     total_imgs = []
     for dir_path in dirs_path_:
+        files = []
         json_path = os.path.join(dir_path, 'record.json')
         while 1:
             try:
@@ -232,8 +233,9 @@ def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,
         img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
         if not loop_no:
             files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
-        else:
+        elif loop_no and not cold_start:
             files = [os.path.join(dir_path, f'{(i + 1) % int(loop_no)}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
+
         total_imgs += files
         img_index_dict['imgIndex'][cam_no] = img_num
     if len(total_imgs):
@@ -315,7 +317,6 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
                         time.sleep(1)
                         re_print(f'{dir_path}暂时没有数据了，等待新数据')
             else:
-
                 sql = 'SELECT * FROM steelrecord ORDER BY ID DESC LIMIT 0,1'
                 curr_steel_no = db_op.ss_latest_one(sql)
                 if curr_steel_no is None:
@@ -325,22 +326,25 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
                     curr_steel_no = curr_steel_no[1]
                 if int(curr_steel_no) != last_steel_no:
                     # process strat
-                    if last_steel_no <0:
+                    if last_steel_no < 0:
+                        cold_boot = True
                         last_steel_no = int(curr_steel_no)
+
                     # process other time
                     else:
+                        cold_boot = False
                         curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                         True, dirs_path,
                                                                                         curr_img_index, q,
                                                                                         edge_shift, bin_thres, cam_res,
-                                                                                        loop_num,logger_)
+                                                                                        loop_num, logger_, cold_boot)
                 # 当前卷处理
                 else:
                     curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                     False, dirs_path,
                                                                                     curr_img_index, q,
                                                                                     edge_shift, bin_thres, cam_res,
-                                                                                    loop_num,logger_)
+                                                                                    loop_num, logger_, cold_boot)
 
     except Exception as E:
         try:
