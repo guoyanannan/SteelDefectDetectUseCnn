@@ -208,15 +208,14 @@ def get_input_tensor(img_arr,  # RGB
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
 
-def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,shift,bin_th,cam_res,loop_no,log_oper,cold_start):
+def get_steelno_data(curr_seq,last_seq,is_up_seq,sub_dirs,img_index_dict,q_read,max_steel_save_no,shift,bin_th,cam_res,loop_no,log_oper,cold_start):
 
     if is_up_seq:
         seq_num = last_seq
     else:
         seq_num = curr_seq
 
-    dir_num = len(sub_dirs)
-    dir_index = os.path.join(str(seq_num % dir_num), '2d'.upper())
+    dir_index = os.path.join(str(seq_num % int(max_steel_save_no)), '2d'.upper())
     dirs_path_ = [os.path.join(path_, dir_index) for path_ in sub_dirs]
     total_imgs = []
     for dir_path in dirs_path_:
@@ -295,6 +294,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         with open('config.yaml', 'r', encoding='utf-8') as f:
             cg = yaml.load(f.read(), Loader=yaml.FullLoader)
         db_config = cg['detect']['dbInfo']
+        max_steelno_save = cg['detect']['infoParameter']['max_save_steelno']
         logger_ = LOGS(log_path)
         curr_img_index = {'imgIndex': {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0}}
         last_steel_no = -1
@@ -335,14 +335,14 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
                         cold_boot = False
                         curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                         True, dirs_path,
-                                                                                        curr_img_index, q,
+                                                                                        curr_img_index, q, max_steelno_save,
                                                                                         edge_shift, bin_thres, cam_res,
                                                                                         loop_num, logger_, cold_boot)
                 # 当前卷处理
                 else:
                     curr_steel_no, last_steel_no, curr_img_index = get_steelno_data(curr_steel_no, last_steel_no,
                                                                                     False, dirs_path,
-                                                                                    curr_img_index, q,
+                                                                                    curr_img_index, q, max_steelno_save,
                                                                                     edge_shift, bin_thres, cam_res,
                                                                                     loop_num, logger_, cold_boot)
 

@@ -23,6 +23,8 @@ detect:
     edge_shift: 0
     max_det: 1000
     pro_num: 3
+    # 检测图像存储最大卷数
+    max_save_steelno: 2
     # 0表示存储所有图像
     # >0 表示对此取余进行覆盖存储图像
     loop: 0
