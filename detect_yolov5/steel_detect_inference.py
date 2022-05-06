@@ -12,7 +12,7 @@ import time
 import yaml
 from threading import Thread
 from multiprocessing import Process, Queue,freeze_support
-from detect_yolov5.utils.data_process import data_tensor_infer,read_images,get_steel_edge
+from detect_yolov5.utils.data_process import data_tensor_infer,read_images,pro_th_readimg
 from detect_yolov5.utils.general import check_img_size, print_args
 from detect_yolov5.steel_detect_yolo import YOLOInit
 from detect_yolov5.utils.normaloperation import re_print,delete_temp
@@ -60,7 +60,9 @@ def run(
     model.log_op.info(some_info)
 
     # read image q
-    read_queue = Queue(600)
+    read_queue = []
+    for i in range(pro_num):
+        read_queue.append(Queue())
     # roi image q
     roi_queue = Queue()
 
@@ -71,7 +73,7 @@ def run(
 
     for i in range(pro_num):
         run_pro = Process(target=data_tensor_infer,
-                          args=(read_queue,
+                          args=(read_queue[i],
                                 roi_queue,
                                 model,
                                 cam_resolution,

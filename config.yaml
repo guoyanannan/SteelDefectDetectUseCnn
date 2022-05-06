@@ -5,8 +5,8 @@ detect:
     logs: './detect_logs'
     rois: './result_roi_8k'
     srcs:
-      - E:\detectsrc1
-      - E:\detectsrc2
+      - C:/detectsrc1
+      - F:/detectsrc2
       -
   
   dbInfo:
@@ -27,12 +27,12 @@ detect:
     max_save_steelno: 2
     # 0表示存储所有图像
     # >0 表示对此取余进行覆盖存储图像
-    loop: 0
+    loop: 600
     # 'cuda device, i.e. 0 or 0,1,2,3 or cpu'
     device: '0'
     cam_res: '8k'
     schema: 0
     half: False
     dnn: False
-    debug: True
+    debug: False
 # defect recognition config
