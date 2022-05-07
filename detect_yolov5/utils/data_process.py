@@ -342,9 +342,7 @@ def get_steelno_data(curr_seq, last_seq, is_up_seq, sub_dirs, img_index_dict, q_
             list_th.append(th_re)
         for th in list_th:
             th.join()
-        for th in list_th:
-            del th
-        del list_th
+
         # 协程
         # tasks = []
         # for path in total_imgs:
@@ -586,6 +584,7 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
     try:
         logger_ = LOGS(log_path)
         model_obj.to(device)
+        model_obj.warmup()
         currt_num = 0
         total_time = 0
         total_get_time = 0

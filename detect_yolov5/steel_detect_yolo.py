@@ -76,7 +76,7 @@ class YOLOInit(nn.Module):
             y = torch.tensor(y, device=self.device)
         return (y, []) if val else y
 
-    def warmup(self, imgsz=(1, 3, 640, 640)):
+    def warmup(self, imgsz=(1, 3, 320, 3200)):
         if any((self.pt, self.jit, self.onnx, self.dnn)):  # warmup types
             if self.device.type != 'cpu':  # only warmup GPU models
                 im = torch.zeros(imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
@@ -275,9 +275,6 @@ class YOLOInit(nn.Module):
             th_roi_list.append(th_save)
         for thd in th_roi_list:
             thd.join()
-        for thd in th_roi_list:
-            del thd
-        del th_roi_list
         #end = time.time()
         # print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
 

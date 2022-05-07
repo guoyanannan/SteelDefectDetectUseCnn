@@ -74,12 +74,6 @@ def run(
         read_queue.append(Queue())
     # roi image q
     roi_queue = Queue()
-
-    read_pro = Process(target=read_images, args=(source, read_queue, schema, num_loop,edge_shift,bin_thres,cam_resolution,log_path,pro_num))
-    read_pro.start()
-    model.log_op.info(f'process-{read_pro.pid} starting success')
-    pid_list += [read_pro]
-
     for i in range(pro_num):
         run_pro = Process(target=data_tensor_infer,
                           args=(read_queue[i],
@@ -104,6 +98,11 @@ def run(
         run_pro.start()
         pid_list.append(run_pro)
         model.log_op.info(f'process-{run_pro.pid} starting success')
+
+    read_pro = Process(target=read_images, args=(source, read_queue, schema, num_loop,edge_shift,bin_thres,cam_resolution,log_path,pro_num))
+    read_pro.start()
+    model.log_op.info(f'process-{read_pro.pid} starting success')
+    pid_list += [read_pro]
 
     # delete temp files
     del_thread = Thread(target=delete_temp, args=(r'C:\Users\{}\AppData\Local\Temp'.format(os.getlogin()),))
