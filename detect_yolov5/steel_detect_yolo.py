@@ -275,6 +275,9 @@ class YOLOInit(nn.Module):
             th_roi_list.append(th_save)
         for thd in th_roi_list:
             thd.join()
+        for thd in th_roi_list:
+            del thd
+        del th_roi_list
         #end = time.time()
         # print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
 

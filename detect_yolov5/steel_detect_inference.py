@@ -21,6 +21,13 @@ from detect_yolov5.utils.normaloperation import re_print,delete_temp
 # ROOT = os.path.dirname(os.path.realpath(__file__))
 # sys.path.append(ROOT)
 
+
+def my_exit(pids):
+    re_print(f'当前操作为强制关闭程序，进程kill中')
+    for pip in pids:
+        pip.terminate()
+    os.kill(os.getpid(), signal.SIGINT)
+
 @torch.no_grad()
 def run(
         weights='yolov5s.pt',  # model.pt path(s)
@@ -49,11 +56,13 @@ def run(
 
     pid_list = []
     source = dirs
+
     try:
         model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize, dnn=dnn)
     except Exception as E:
         re_print(E)
         raise E
+    model.log_op.info(f'zhu-process-{os.getpid()} starting success')
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
     some_info = f'图像路径:{source} 显卡索引:{device} 图像缩放尺寸:{imgsz} 循环数量:{num_loop}'
@@ -99,25 +108,20 @@ def run(
     # delete temp files
     del_thread = Thread(target=delete_temp, args=(r'C:\Users\{}\AppData\Local\Temp'.format(os.getlogin()),))
     del_thread.start()
+    # 捕捉关闭按钮
+    win32api.SetConsoleCtrlHandler(lambda x: my_exit(pid_list), True)
     num =0
     time_t = 0
     time_tt = 0
     while 1:
         try:
-            # 捕捉关闭按钮
-            def my_exit(pids):
-                for pip in pid_list:
-                    pip.terminate()
-                os.kill(os.getpid(), signal.SIGINT)
-
-            win32api.SetConsoleCtrlHandler(lambda func:my_exit(pid_list), True)
             # if a process fails, kill them all
             for pip in pid_list:
                 if not pip.is_alive():
                     for pip_kill in pid_list:
                         pip_kill.terminate()
                     os.kill(os.getpid(), signal.SIGINT)
-            # 该队列用于存储大面积缺陷和通长缺陷，待实现
+            # 该队列用于存储大面积缺陷和通长缺陷，待开始实现
             # if not roi_queue.empty():
             #     re_print(f'--------------------------------% {roi_queue.qsize()} %----------------------------------')
             #     start_ = time.time()

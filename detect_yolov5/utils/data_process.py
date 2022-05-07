@@ -342,6 +342,9 @@ def get_steelno_data(curr_seq, last_seq, is_up_seq, sub_dirs, img_index_dict, q_
             list_th.append(th_re)
         for th in list_th:
             th.join()
+        for th in list_th:
+            del th
+        del list_th
         # 协程
         # tasks = []
         # for path in total_imgs:
