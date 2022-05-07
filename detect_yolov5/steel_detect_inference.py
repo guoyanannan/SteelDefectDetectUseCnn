@@ -5,6 +5,7 @@ Run inference on steel images
 import argparse
 import os.path
 import sys
+import win32api
 import signal
 import cv2
 import torch
@@ -49,8 +50,7 @@ def run(
     pid_list = []
     source = dirs
     try:
-        model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize,
-                         dnn=dnn)
+        model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize, dnn=dnn)
     except Exception as E:
         re_print(E)
         raise E
@@ -100,6 +100,13 @@ def run(
     del_thread.start()
     while 1:
         try:
+            # 捕捉关闭按钮
+            def my_exit(pids):
+                for pip in pid_list:
+                    pip.terminate()
+                os.kill(os.getpid(), signal.SIGINT)
+
+            win32api.SetConsoleCtrlHandler(lambda func:my_exit(pid_list), True)
             # if a process fails, kill them all
             for pip in pid_list:
                 if not pip.is_alive():
@@ -123,7 +130,8 @@ def run(
                 if pip.is_alive():
                     for pip_kill in pid_list:
                         pip_kill.terminate()
-                    os.kill(os.getpid(), signal.SIGINT)
+                os.kill(os.getpid(), signal.SIGINT)
+
 
 
 def parse_opt():
