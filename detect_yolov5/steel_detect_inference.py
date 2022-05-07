@@ -66,7 +66,7 @@ def run(
     # roi image q
     roi_queue = Queue()
 
-    read_pro = Process(target=read_images, args=(source, read_queue, schema, num_loop,edge_shift,bin_thres,cam_resolution,log_path))
+    read_pro = Process(target=read_images, args=(source, read_queue, schema, num_loop,edge_shift,bin_thres,cam_resolution,log_path,pro_num))
     read_pro.start()
     model.log_op.info(f'process-{read_pro.pid} starting success')
     pid_list += [read_pro]
@@ -88,7 +88,7 @@ def run(
                                 max_det,
                                 half,
                                 debug,
-                                log_path
+                                log_path,
                                 )
                           )
         run_pro.start()
@@ -116,7 +116,7 @@ def run(
                 cv2.imwrite(path_save, img_roi)
             else:
                 re_print(f'缺陷数据队列中暂时没有了,等待')
-                time.sleep(0.1)
+                time.sleep(1)
         except Exception as E:
             model.log_op.info(E)
             for pip in pid_list:
