@@ -89,6 +89,7 @@ def run(
                                 half,
                                 debug,
                                 log_path,
+                                rois_dir,
                                 )
                           )
         run_pro.start()
@@ -98,6 +99,9 @@ def run(
     # delete temp files
     del_thread = Thread(target=delete_temp, args=(r'C:\Users\{}\AppData\Local\Temp'.format(os.getlogin()),))
     del_thread.start()
+    num =0
+    time_t = 0
+    time_tt = 0
     while 1:
         try:
             # 捕捉关闭按钮
@@ -113,17 +117,25 @@ def run(
                     for pip_kill in pid_list:
                         pip_kill.terminate()
                     os.kill(os.getpid(), signal.SIGINT)
-
-            if not roi_queue.empty():
-                roi_infos = roi_queue.get()
-                img_roi,img_name = tuple(roi_infos.values())
-                if not os.path.exists(rois_dir):
-                    os.makedirs(rois_dir)
-                path_save = os.path.join(rois_dir, img_name)
-                cv2.imwrite(path_save, img_roi)
-            else:
-                re_print(f'缺陷数据队列中暂时没有了,等待')
-                time.sleep(1)
+            # 该队列用于存储大面积缺陷和通长缺陷，待实现
+            # if not roi_queue.empty():
+            #     re_print(f'--------------------------------% {roi_queue.qsize()} %----------------------------------')
+            #     start_ = time.time()
+            #     roi_infos = roi_queue.get()
+            #     start_get = time.time()
+            #     img_roi,img_name = tuple(roi_infos.values())
+            #     if not os.path.exists(rois_dir):
+            #         os.makedirs(rois_dir)
+            #     path_save = os.path.join(rois_dir, img_name)
+            #     cv2.imwrite(path_save, img_roi)
+            #     e_ = time.time()
+            #     num += 1
+            #     time_t += start_get - start_
+            #     time_tt += e_ - start_get
+            #     re_print(f'=========读取时间{time_t/num}s 存图时间{time_tt/num}s 共{(time_tt+time_t)/num}s============')
+            # else:
+            #     re_print(f'缺陷数据队列中暂时没有了,等待')
+            #     time.sleep(1)
         except Exception as E:
             model.log_op.info(E)
             for pip in pid_list:

@@ -1,12 +1,15 @@
+import math
 import os
 import json
 import torch
 import cv2
 import sys
+import time
 import pandas as pd
 import torch.nn as nn
 import numpy as np
-from .utils.normaloperation import select_device,LOGS,marge_box,xyxy_img_nms
+from threading import Thread
+from .utils.normaloperation import select_device,LOGS,marge_box,xyxy_img_nms,thread_save_rois
 from .utils.general import non_max_suppression,scale_coords
 ROOT = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(ROOT)
@@ -82,6 +85,7 @@ class YOLOInit(nn.Module):
 
     def pre_process_detect(self,
                            im_path,  # 用于存图等的逻辑撰写
+                           roi_dir_path,
                            result_roi_q,
                            left_edge,
                            right_edge,
@@ -187,7 +191,7 @@ class YOLOInit(nn.Module):
         if cam_resolution.lower() == '8k':
             h_img_ori, w_img_ori = im_one_orin_shape[-2],im_one_orin_shape[-1]*2
         file_name, file_mat = os.path.splitext(os.path.basename(im_path))
-
+        roi_list_ = []
         for i, box in enumerate(nms_):
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
             # 越边界
@@ -215,6 +219,10 @@ class YOLOInit(nn.Module):
             # im_roi_draw = cv2.cvtColor(im_roi_draw,cv2.COLOR_GRAY2RGB)
             # cv2.rectangle(im_roi_draw, (x1_roi,y1_roi), (x2_roi,y2_roi), (255,0,0), thickness=3, lineType=cv2.LINE_AA)
             img_roi = img_split[y1_cut:y2_cut, x1_cut:x2_cut]
+            # if abs(x2-x1) > 20:
+            #     img_roi = cv2.resize(img_roi,(img_roi.shape[1]//4,img_roi.shape[0]))
+            #     x1,x2 = x1 // 4 ,x2 //4
+
             if debug:
                 roi_file_name = '_'.join([file_name, str(i),
                                           str(x1), str(y1), str(x2), str(y2),
@@ -231,7 +239,8 @@ class YOLOInit(nn.Module):
                                           ]) + str(file_mat)
 
             img_roi_info = {'data':img_roi,'name':roi_file_name}
-            result_roi_q.put(img_roi_info)
+            # result_roi_q.put(img_roi_info)
+            roi_list_.append(img_roi_info)
             if debug:
                 # 画图中的框
                 p1, p2 = (x1,y1), (x2,y2)
@@ -257,6 +266,18 @@ class YOLOInit(nn.Module):
             file_name = os.path.basename(im_path)
             path_save = os.path.join(im_draw_path,file_name)
             cv2.imwrite(path_save,img_draw_)
+        #start = time.time()
+        roi_list_bs_no = math.ceil(len(roi_list_)/6)
+        th_roi_list = []
+        for i in range(6):
+            th_save = Thread(target=thread_save_rois,args=(roi_list_[i*roi_list_bs_no:(i+1)*roi_list_bs_no],roi_dir_path,))
+            th_save.start()
+            th_roi_list.append(th_save)
+        for thd in th_roi_list:
+            thd.join()
+        #end = time.time()
+        # print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
+
 
     @staticmethod
     def model_type(p='path/to/model.pt'):

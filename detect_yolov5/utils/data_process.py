@@ -579,7 +579,7 @@ def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
 
 
 # (img_arr_rgb, cam_resolution, imgsz, stride, device, pt,......)
-def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,fp16,debug,log_path):
+def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,fp16,debug,log_path,save_rois_path):
     try:
         logger_ = LOGS(log_path)
         model_obj.to(device)
@@ -600,6 +600,7 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
                 img_ori_one_shape, img_ori_one_scale_tensor, img_cut_two_shape, img_cut_two_scale_tensor, img_cut_bs_shape, img_cut_bs_scale_tensor \
                     = get_input_tensor(img_arr_rgb, cam_resolution, img_resize, stride, device, auto,fp16)
                 model_obj.pre_process_detect(img_path,
+                                             save_rois_path,
                                              result_roi_q,
                                              left_eg,
                                              right_eg,
