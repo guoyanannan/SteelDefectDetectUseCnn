@@ -22,8 +22,8 @@ from detect_yolov5.utils.normaloperation import re_print,delete_temp
 # sys.path.append(ROOT)
 
 
-def my_exit(pids):
-    re_print(f'当前操作为强制关闭程序，进程kill中')
+def my_exit(pids,ex_logger):
+    ex_logger.info(f'当前操作为强制关闭程序，进程kill中')
     for pip in pids:
         pip.terminate()
     os.kill(os.getpid(), signal.SIGINT)
@@ -62,7 +62,7 @@ def run(
     except Exception as E:
         re_print(E)
         raise E
-    model.log_op.info(f'zhu-process-{os.getpid()} starting success')
+    model.log_op.info(f'host process-{os.getpid()} starting success')
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
     some_info = f'图像路径:{source} 显卡索引:{device} 图像缩放尺寸:{imgsz} 循环数量:{num_loop}'
@@ -74,6 +74,7 @@ def run(
         read_queue.append(Queue())
     # roi image q
     roi_queue = Queue()
+    # run model
     for i in range(pro_num):
         run_pro = Process(target=data_tensor_infer,
                           args=(read_queue[i],
@@ -98,7 +99,7 @@ def run(
         run_pro.start()
         pid_list.append(run_pro)
         model.log_op.info(f'process-{run_pro.pid} starting success')
-
+    # run get data
     read_pro = Process(target=read_images, args=(source, read_queue, schema, num_loop,edge_shift,bin_thres,cam_resolution,log_path,pro_num))
     read_pro.start()
     model.log_op.info(f'process-{read_pro.pid} starting success')
@@ -108,7 +109,7 @@ def run(
     del_thread = Thread(target=delete_temp, args=(r'C:\Users\{}\AppData\Local\Temp'.format(os.getlogin()),))
     del_thread.start()
     # 捕捉关闭按钮
-    win32api.SetConsoleCtrlHandler(lambda x: my_exit(pid_list), True)
+    win32api.SetConsoleCtrlHandler(lambda x: my_exit(pid_list,model.log_op), True)
     num =0
     time_t = 0
     time_tt = 0

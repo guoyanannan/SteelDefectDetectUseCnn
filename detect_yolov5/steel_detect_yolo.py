@@ -266,7 +266,7 @@ class YOLOInit(nn.Module):
             file_name = os.path.basename(im_path)
             path_save = os.path.join(im_draw_path,file_name)
             cv2.imwrite(path_save,img_draw_)
-        #start = time.time()
+        start = time.time()
         roi_list_bs_no = math.ceil(len(roi_list_)/6)
         th_roi_list = []
         for i in range(6):
@@ -275,8 +275,11 @@ class YOLOInit(nn.Module):
             th_roi_list.append(th_save)
         for thd in th_roi_list:
             thd.join()
-        #end = time.time()
-        # print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
+        for thd_ in th_roi_list:
+            del thd_
+        del th_roi_list
+        end = time.time()
+        #print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
 
 
     @staticmethod

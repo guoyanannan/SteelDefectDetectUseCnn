@@ -342,7 +342,9 @@ def get_steelno_data(curr_seq, last_seq, is_up_seq, sub_dirs, img_index_dict, q_
             list_th.append(th_re)
         for th in list_th:
             th.join()
-
+        for th_ in list_th:
+            del th_
+        del list_th
         # 协程
         # tasks = []
         # for path in total_imgs:
@@ -364,7 +366,7 @@ def get_steelno_data(curr_seq, last_seq, is_up_seq, sub_dirs, img_index_dict, q_
             total_time = 0
         else:
             re_print(f'流水号{curr_seq}各相机号图像{cam_index_info}已读取完成,暂时没有待读取图像，等待')
-            time.sleep(0.05)
+            time.sleep(0.1)
 
     return curr_seq, last_seq, img_index_dict, curr_img_num, total_time
 
@@ -483,7 +485,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         if not schema:
             db_op = DbMysqlOp(ip=db_config['db_ip'], user=db_config['db_user'], psd=db_config['db_psd'],
                               db_name=db_config['db_name'])
-        #用于统计
+        # 用于统计
         index_q_num = 0
         total_time = 0
         while True:
@@ -508,6 +510,9 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
 
                     for th in list_th:
                         th.join()
+                    for th_ in list_th:
+                        del th_
+                    del list_th
                     end_time = time.time()
                     re_print(f'当前共读取 {len(total_images_s)} 张图像耗时{end_time-start_time}s,平均均耗时{(end_time-start_time)/len(total_images_s)}s')
                 else:
