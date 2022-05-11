@@ -44,7 +44,7 @@ def run(
         pro_num=3,  # process number
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         cam_resolution='4k',  # camera resolution
-        schema=1,  # 0：有算法测试程序，1：没有算法测试程序
+        schema=1,  # 1：有算法测试程序(旧架构)，0：没有算法测试程序(新架构)
         classes=None,  # filter by class: --class 0, or --class 0 2 3
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
@@ -94,6 +94,7 @@ def run(
                                 debug,
                                 log_path,
                                 rois_dir,
+                                schema,
                                 )
                           )
         run_pro.start()
@@ -121,7 +122,7 @@ def run(
                     for pip_kill in pid_list:
                         pip_kill.terminate()
                     os.kill(os.getpid(), signal.SIGINT)
-            # 该队列用于存储大面积缺陷和通长缺陷，待开始实现
+            # # 该队列用于存储大面积缺陷和通长缺陷，待开始实现
             # if not roi_queue.empty():
             #     re_print(f'--------------------------------% {roi_queue.qsize()} %----------------------------------')
             #     start_ = time.time()

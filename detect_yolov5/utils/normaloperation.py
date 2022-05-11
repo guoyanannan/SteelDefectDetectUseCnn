@@ -62,7 +62,10 @@ def xyxy_img_nms(boxes,classnames,iou_thresh):
 def thread_save_rois(infos,save_dir_path):
     # img_roi_info = {'data':img_roi,'name':roi_file_name}
     if not os.path.exists(save_dir_path):
-        os.makedirs(save_dir_path)
+        try:
+            os.makedirs(save_dir_path)
+        except:
+            pass
     for info_dict in infos:
         img_gray,img_name = tuple(info_dict.values())
         path_save = os.path.join(save_dir_path, img_name)

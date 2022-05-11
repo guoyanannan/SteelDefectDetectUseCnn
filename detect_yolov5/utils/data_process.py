@@ -8,12 +8,14 @@ import json
 import yaml
 import gevent
 import math
+import random
 import numpy as np
 from threading import Thread
 from .normaloperation import LOGS, re_print
 from .db_mysql import DbMysqlOp
 
 IMG_FORMATS = 'bmp', 'jpeg', 'jpg',  'png'
+
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
@@ -209,6 +211,7 @@ def get_input_tensor(img_arr,  # RGB
            img_cut_two_shape, img_cut_two_scale_tensor, \
            img_cut_bs_shape, img_cut_bs_scale_tensor
 
+
 def event_reads(path,shift, bin_th, cam_res, q_read, curr_img_num):
     # 获取图片数组
     _, file_mat = os.path.splitext(os.path.basename(path))
@@ -246,7 +249,8 @@ def event_reads(path,shift, bin_th, cam_res, q_read, curr_img_num):
     q_list_index = curr_img_num % len(q_read)
     q_read[q_list_index].put(dict_info)
 
-def thread_reads(paths,shift, bin_th, cam_res, q_read,name):
+
+def thread_reads(paths,shift, bin_th, cam_res, q_read, steelno_processed):
     for path in paths:
         # 获取图片数组
         _, file_mat = os.path.splitext(os.path.basename(path))
@@ -275,17 +279,19 @@ def thread_reads(paths,shift, bin_th, cam_res, q_read,name):
                 re_print(E)
                 time.sleep(0.001)
                 continue
-        # 解析数据
-        fx = (float(steel_right) - float(steel_left)) / img_w
-        fy = (float(steel_end) - float(steel_start)) / img_h
-        img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
-                             str(img_index), str(steel_left), str(steel_start),
-                             str(fx), str(fy), 'H']) + str(file_mat)
-        dict_info = {'img_gray': img_arr, 'img_path': img_name, 'left_e': l_e, 'right_e': r_e}
-        q_size_list = [x.qsize() for x in q_read]
-        re_print(f'>>> {name}:{q_size_list} <<<')
-        q_list_index = q_size_list.index(min(q_size_list))
-        q_read[q_list_index].put(dict_info)
+        if int(steel_no_bmp) == int(steelno_processed):
+            # 解析数据
+            fx = (float(steel_right) - float(steel_left)) / img_w
+            fy = (float(steel_end) - float(steel_start)) / img_h
+            img_name = '_'.join(['SCILRTB', str(steel_no_bmp), str(cam_no_bmp),
+                                 str(img_index), str(steel_left), str(steel_start),
+                                 str(fx), str(fy), 'H']) + str(file_mat)
+            dict_info = {'img_gray': img_arr, 'img_path': img_name, 'left_e': l_e, 'right_e': r_e}
+            # q_size_list = [x.qsize() for x in q_read]
+            # re_print(f'>>> {name}:{q_size_list} <<<')
+            # q_list_index = q_size_list.index(min(q_size_list))
+            q_list_index = random.randint(0, len(q_read)-1)
+            q_read[q_list_index].put(dict_info)
 
 
 def thread_reads_schema(paths, edge_shift, bin_thres, cam_res,q,logger_):
@@ -293,8 +299,9 @@ def thread_reads_schema(paths, edge_shift, bin_thres, cam_res,q,logger_):
         img_arr = cv2.imread(path, 0)
         l_e, r_e = select_edge(img_arr, edge_shift, bin_thres, cam_res)
         dict_info = {'img_gray': img_arr, 'img_path': path, 'left_e': l_e, 'right_e': r_e}
-        q_size_list = [x.qsize() for x in q]
-        q_list_index = q_size_list.index(min(q_size_list))
+        # q_size_list = [x.qsize() for x in q]
+        # q_list_index = q_size_list.index(min(q_size_list))
+        q_list_index = random.randint(0, len(q) - 1)
         q[q_list_index].put(dict_info)
         remove_file(path, logger=logger_)
 
@@ -323,21 +330,23 @@ def get_steelno_data(curr_seq, last_seq, is_up_seq, sub_dirs, img_index_dict, q_
                 time.sleep(0.001)
                 continue
 
-        img_num, cam_no = int(json_info['imgNum']), str(json_info['camNo'])
-        if not loop_no:
-            files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
-        elif loop_no and not cold_start:
-            files = [os.path.join(dir_path, f'{(i + 1) % int(loop_no)}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
+        img_num, cam_no,steel_no = int(json_info['imgNum']), str(json_info['camNo']),int(json_info['steelNo'])
+        if steel_no == int(seq_num):
+            if not loop_no:
+                files = [os.path.join(dir_path, f'{i + 1}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
+            elif loop_no and not cold_start:
+                files = [os.path.join(dir_path, f'{(i + 1) % int(loop_no)}.bmp') for i in range(img_index_dict['imgIndex'][cam_no], img_num)]
 
-        total_imgs += files
-        img_index_dict['imgIndex'][cam_no] = img_num
+            total_imgs += files
+            img_index_dict['imgIndex'][cam_no] = img_num
+
     if len(total_imgs):
         t1 = time.time()
-        flag_pro_no = pro_number+2
+        flag_pro_no = pro_number*3
         num = math.ceil(len(total_imgs)/flag_pro_no)
         list_th = []
         for i in range(flag_pro_no):
-            th_re = Thread(target=thread_reads,args=(total_imgs[i*num:(i+1)*num],shift, bin_th, cam_res, q_read,f'thread-{i}',))
+            th_re = Thread(target=thread_reads,args=(total_imgs[i*num:(i+1)*num],shift, bin_th, cam_res, q_read,seq_num,))
             th_re.start()
             list_th.append(th_re)
         for th in list_th:
@@ -354,7 +363,11 @@ def get_steelno_data(curr_seq, last_seq, is_up_seq, sub_dirs, img_index_dict, q_
         curr_img_num += len(total_imgs)
         t2 = time.time()
         total_time += t2 - t1
-        re_print(f'已读判流水号{seq_num}共 [{curr_img_num}] 张图像平均耗时：{total_time / curr_img_num}s,当前批次读判图像共 【{len(total_imgs)}】 张耗时：{t2 - t1}s')
+        q_size_list = [x.qsize() for x in q_read]
+        re_print(f'已读判流水号 {seq_num} 共 [{curr_img_num}] 张图像平均耗时：{total_time / curr_img_num}s,当前批次读判图像共 【{len(total_imgs)}】 张耗时：{t2 - t1}s，当前存储图像队列：{q_size_list}')
+        if len(total_imgs)>100:
+            log_oper.info(f'累计读取缓慢超过{len(total_imgs)}，缓慢约{len(total_imgs)/12}s')
+            raise
     else:
         cam_index_info = img_index_dict['imgIndex']
         if is_up_seq:
@@ -490,6 +503,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         total_time = 0
         while True:
             # 有无算法测试程序，也可用来进行离线调试
+            # 1:有算法测试程序 2:无算法测试程序
             if schema:
                 total_images_s = []
                 for dir_path in dirs_path:
@@ -498,7 +512,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
                     total_images_s += images
 
                 if len(total_images_s):
-                    flag_no = pro_no+2
+                    flag_no = pro_no*3
                     num = math.ceil(len(total_images_s) / flag_no)
                     list_th = []
                     start_time = time.time()
@@ -584,8 +598,26 @@ def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
         raise E
 
 
+def get_data_from_q(infos:list,data_q):
+    while 1:
+        num = 0
+        total_time = 0
+        if not data_q.empty():
+            for i in range(data_q.qsize()):
+                start_time = time.time()
+                img_infos = data_q.get()
+                #img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
+                infos.append(tuple(img_infos.values()))
+                num += 1
+                end_time = time.time()
+                total_time += end_time-start_time
+            re_print(f'###本次读取队列 {num} 个数据共耗时 {total_time}s,平均耗时{total_time/num}s###')
+
+
+
+
 # (img_arr_rgb, cam_resolution, imgsz, stride, device, pt,......)
-def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,fp16,debug,log_path,save_rois_path):
+def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,device,auto,conf_thres,iou_thres,classes,agnostic_nms,max_det,fp16,debug,log_path,save_rois_path,is_or_no_schema):
     try:
         logger_ = LOGS(log_path)
         model_obj.to(device)
@@ -594,11 +626,15 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
         total_time = 0
         total_get_time = 0
         last_seq = -1
+        img_info_list = []
+        data_thd = Thread(target=get_data_from_q,args=(img_info_list,q))
+        data_thd.start()
         while 1:
-            if not q.empty():
+            if len(img_info_list):
                 start_time = time.time()
-                img_infos = q.get()
-                img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
+                img_arr_rgb, img_path, left_eg, right_eg = img_info_list[0]
+                # img_arr_rgb, img_path, left_eg, right_eg = tuple(img_infos.values())
+                del img_info_list[0]
                 time_get = time.time()
                 if len(img_arr_rgb.shape) == 2:
                     img_arr_rgb = cv2.cvtColor(img_arr_rgb,cv2.COLOR_GRAY2RGB)
@@ -624,26 +660,30 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
                                              agnostic_nms,
                                              max_det,
                                              cam_resolution,
+                                             is_or_no_schema,
                                              debug=debug,
                                             )
                 end_time = time.time()
                 currt_num += 1
                 total_time += end_time-start_time
                 total_get_time += time_get-start_time
-                if not debug:
 
+                if not debug:
                     curr_seq,curr_camno,curr_img_index = img_path.split('_')[1:4]
-                    print('')
-                    re_print(f'process-{os.getpid()} 已处理流水号为{curr_seq}的{currt_num}张图片,当前处理的是{curr_camno}号相机第<<{int(curr_img_index)+1}>>张图像,平均耗时{total_time / currt_num}s,平均获取图像耗时{total_get_time / currt_num}')
                     if int(curr_seq) != last_seq:
-                        currt_num = 0
-                        total_time = 0
+                        currt_num = 1
+                        total_time = end_time-start_time
+                        total_get_time = time_get-start_time
                         last_seq = int(curr_seq)
+                    re_print(
+                        f'process-{os.getpid()} / 剩余待处理 [{len(img_info_list)}] >已处理流水号为{curr_seq}的{currt_num}张图片,'
+                        f'当前处理的是{curr_camno}号相机第<<{int(curr_img_index) + 1}>>张图像,平均耗时{total_time / currt_num}s,平均获取图像耗时{total_get_time / currt_num}<')
+
                 else:
-                    re_print(f'process-{os.getpid()} 已处理{currt_num}张图片,平均耗时{total_time / currt_num}s')
                     if currt_num > int(1e6):
-                        currt_num =0
-                        total_time = 0
+                        currt_num = 1
+                        total_time = end_time-start_time
+                    re_print(f'process-{os.getpid()}  / 剩余待处理 [{len(img_info_list)}] 已处理{currt_num}张图片,平均耗时{total_time / currt_num}s')
             else:
                 # re_print(f'process-{os.getpid()}暂时无处理数据,算法处理速度快于图像前处理速度')
                 if debug:

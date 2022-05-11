@@ -102,6 +102,7 @@ class YOLOInit(nn.Module):
                            agnostic_nms,
                            max_det,
                            cam_resolution,
+                           schema,
                            debug=False,  #debug mode
                            ):
 
@@ -181,17 +182,25 @@ class YOLOInit(nn.Module):
             nms_ = []
         else:
             nms_ = torch.vstack([one_result_for_img, bs_result_for_img])
+
         # nms
         if len(nms_):
             nms_ = xyxy_img_nms(nms_, self.names, iou_thresh=0.05)
 
-        img_draw_ = img_draw.copy()
-        img_split = cv2.cvtColor(img_draw, cv2.COLOR_RGB2GRAY)
+        if debug:
+            img_draw_ = img_draw.copy()
+        # t1 = time.time()
+        # img_split = cv2.cvtColor(img_draw, cv2.COLOR_RGB2GRAY)
+        # t2 = time.time()
+        img_split = img_draw[:,:,0]
+        # t3 = time.time()
+        # print(f'=======================1时间{t2-t1}s,2时间{t3-t2}s=========================')
         h_img_ori,w_img_ori = im_one_orin_shape[-2:]
         if cam_resolution.lower() == '8k':
             h_img_ori, w_img_ori = im_one_orin_shape[-2],im_one_orin_shape[-1]*2
         file_name, file_mat = os.path.splitext(os.path.basename(im_path))
         roi_list_ = []
+
         for i, box in enumerate(nms_):
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
             # 越边界
@@ -208,39 +217,69 @@ class YOLOInit(nn.Module):
             if y2_cut > h_img_ori:
                 y2_cut = h_img_ori-1
 
-            # # box在 ROI的 位置
-            # # cut roi from image
-            # x1_roi,y1_roi = abs(x1-x1_cut),abs(y1-y1_cut)
-            # x2_roi,y2_roi = x1_roi+(x2-x1),y1_roi+(y2-y1)
-            # im_roi = img_split[y1_cut:y2_cut,x1_cut:x2_cut]
+            # box在 ROI的 位置
+            # cut roi from image
+            x1_roi,y1_roi = abs(x1-x1_cut),abs(y1-y1_cut)
+            x2_roi,y2_roi = x1_roi+(x2-x1),y1_roi+(y2-y1)
+            img_roi = img_split[y1_cut:y2_cut,x1_cut:x2_cut]
+            if not schema:
+                if abs(x2-x1) > 30:
+                    img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
+                    x1_roi,x2_roi = x1_roi//3, x2_roi//3
+                if abs(x2-x1)*abs(y2-y1) >= 1024 * 1024:
+                    img_roi = cv2.resize(img_roi, (img_roi.shape[1]//4, img_roi.shape[0]//4))
+                    x1_roi, y1_roi, x2_roi, y2_roi = x1_roi//4, y1_roi//4, x2_roi//4, y2_roi//4
+                if debug:
+                    img_roi_draw = cv2.cvtColor(img_roi, cv2.COLOR_GRAY2RGB)
+                    cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3,lineType=cv2.LINE_AA)
             #
             # # 画ROI中的框
             # im_roi_draw = im_roi.copy()
             # im_roi_draw = cv2.cvtColor(im_roi_draw,cv2.COLOR_GRAY2RGB)
             # cv2.rectangle(im_roi_draw, (x1_roi,y1_roi), (x2_roi,y2_roi), (255,0,0), thickness=3, lineType=cv2.LINE_AA)
-            img_roi = img_split[y1_cut:y2_cut, x1_cut:x2_cut]
+            
+            # img_roi = img_split[y1_cut:y2_cut, x1_cut:x2_cut]
+            
             # if abs(x2-x1) > 20:
             #     img_roi = cv2.resize(img_roi,(img_roi.shape[1]//4,img_roi.shape[0]))
             #     x1,x2 = x1 // 4 ,x2 //4
 
             if debug:
-                roi_file_name = '_'.join([file_name, str(i),
-                                          str(x1), str(y1), str(x2), str(y2),
-                                          ]) + str(file_mat)
+                if not schema:
+                    roi_file_name = '_'.join([file_name, str(i),
+                                              str(x1_roi), str(x2_roi), str(y1_roi), str(y2_roi),
+                                              str(x1), str(x2),str(y1), str(y2),
+                                              ]) + str(file_mat)
+                else:
+                    roi_file_name = '_'.join([file_name, str(i),
+                                              str(x1), str(x2), str(y1), str(y2),
+                                              ]) + str(file_mat)
             else:
                 flag_str,steel_no,camera_no,img_index,left_pos,top_pos,fx,fy,_ = file_name.split('_')
-                left_in_steel,top_in_steel = float(left_pos)+x1*float(fx), float(top_pos)+y1*float(fy)
-                right_in_steel,bot_in_steel = float(left_pos)+x2*float(fx), float(top_pos)+y2*float(fy)
-                roi_file_name = '_'.join([str(flag_str), str(steel_no),str(camera_no),str(img_index),
-                                          str(left_edge),str(right_edge),
-                                          str(x1), str(x2), str(y1), str(y2),
-                                          str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
-                                          'H'
-                                          ]) + str(file_mat)
-
-            img_roi_info = {'data':img_roi,'name':roi_file_name}
+                left_in_steel, top_in_steel = int(float(left_pos) + x1 * float(fx)), int(float(top_pos) + y1 * float(fy))
+                right_in_steel, bot_in_steel = int(float(left_pos) + x2 * float(fx)), int(float(top_pos) + y2 * float(fy))
+                if not schema:
+                    roi_file_name = '_'.join([str(flag_str), str(steel_no), str(camera_no), str(img_index),
+                                              str(left_edge), str(right_edge),
+                                              str(x1_roi), str(x2_roi), str(y1_roi), str(y2_roi),
+                                              str(x1), str(x2), str(y1), str(y2),
+                                              str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
+                                              'H'
+                                              ]) + str(file_mat)
+                else:
+                    roi_file_name = '_'.join([str(flag_str), str(steel_no),str(camera_no),str(img_index),
+                                              str(left_edge),str(right_edge),
+                                              str(x1), str(x2), str(y1), str(y2),
+                                              str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
+                                              'H'
+                                              ]) + str(file_mat)
+            if debug:
+                img_roi_info = {'data': img_roi_draw, 'name': roi_file_name}
+            else:
+                img_roi_info = {'data':img_roi,'name':roi_file_name}
             # result_roi_q.put(img_roi_info)
             roi_list_.append(img_roi_info)
+            
             if debug:
                 # 画图中的框
                 p1, p2 = (x1,y1), (x2,y2)
@@ -257,6 +296,7 @@ class YOLOInit(nn.Module):
                 # 边界
                 cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
                 cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
+
         if debug:
             im_draw_path = './debug_result/images_4k/'
             if cam_resolution == '8k':
@@ -266,20 +306,22 @@ class YOLOInit(nn.Module):
             file_name = os.path.basename(im_path)
             path_save = os.path.join(im_draw_path,file_name)
             cv2.imwrite(path_save,img_draw_)
-        start = time.time()
-        roi_list_bs_no = math.ceil(len(roi_list_)/6)
-        th_roi_list = []
-        for i in range(6):
-            th_save = Thread(target=thread_save_rois,args=(roi_list_[i*roi_list_bs_no:(i+1)*roi_list_bs_no],roi_dir_path,))
-            th_save.start()
-            th_roi_list.append(th_save)
-        for thd in th_roi_list:
-            thd.join()
-        for thd_ in th_roi_list:
-            del thd_
-        del th_roi_list
-        end = time.time()
-        #print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
+        # start = time.time()
+        # roi_list_bs_no = math.ceil(len(roi_list_)/2)
+        # th_roi_list = []
+        # for i in range(2):
+        #     th_save = Thread(target=thread_save_rois,args=(roi_list_[i*roi_list_bs_no:(i+1)*roi_list_bs_no],roi_dir_path,))
+        #     th_save.start()
+        #     th_roi_list.append(th_save)
+        # for thd in th_roi_list:
+        #     thd.join()
+        # for thd_ in th_roi_list:
+        #     del thd_
+        # del th_roi_list
+
+        thread_save_rois(roi_list_,roi_dir_path)
+        # end = time.time()
+        # print(f'process-{os.getpid()} kkkkkkkkkkkkkkk 存储{len(roi_list_)}张图片耗时{end-start}s kkkkkkkkkkkkkkkkkkk')
 
 
     @staticmethod
