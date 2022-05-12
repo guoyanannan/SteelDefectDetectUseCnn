@@ -96,7 +96,7 @@ wheels/
 /wandb/
 .installed.cfg
 *.egg
-
+kpl.py
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import cv2
 import shutil
 import logging
 import platform
@@ -16,6 +17,7 @@ except ImportError:
 
 
 def delete_temp(path):
+    time.sleep(60)
     temp_path = path
     while 1:
         for file in os.listdir(temp_path):
@@ -26,7 +28,7 @@ def delete_temp(path):
                     shutil.rmtree(file_path)
                 except Exception as E:
                     # print(E)
-                    time.sleep(30)
+                    time.sleep(60)
                     pass
 
             if file.split('.')[-1] in ('log', 'py', 'dll'):
@@ -34,7 +36,7 @@ def delete_temp(path):
                     os.remove(file_path)
                 except Exception as E:
                     # print(E)
-                    time.sleep(30)
+                    time.sleep(60)
                     pass
 
 def re_print(info):
@@ -56,6 +58,18 @@ def xyxy_img_nms(boxes,classnames,iou_thresh):
             return None
     else:
         raise Exception('The input value is null, and what is needed is a tensor of shape (n,6)')
+
+def thread_save_rois(infos,save_dir_path):
+    # img_roi_info = {'data':img_roi,'name':roi_file_name}
+    if not os.path.exists(save_dir_path):
+        try:
+            os.makedirs(save_dir_path)
+        except:
+            pass
+    for info_dict in infos:
+        img_gray,img_name = tuple(info_dict.values())
+        path_save = os.path.join(save_dir_path, img_name)
+        cv2.imwrite(path_save, img_gray)
 
 
 def marge_box(pre_boxes,class_names,iou_thresh=0.0,debug=False):
