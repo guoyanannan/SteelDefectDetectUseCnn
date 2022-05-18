@@ -4,36 +4,43 @@ import pymysql
 class DbMysqlOp:
     def __init__(self,ip,user,psd,db_name,charset='utf8',pt=3306):
         self.create_dbname(ip, user, psd, db_name, pt)
-        try:
-            self.conn = pymysql.connect(host=ip,
-                                   port=pt,
-                                   user=user,
-                                   password=psd,
-                                   database=db_name,
-                                   charset=charset,
-                                   )
-            self.cur = self.conn.cursor()
-        except Exception as E:
-            raise E
-        else:
-            print(f'数据库{db_name}连接成功!!!!!!')
+        # try:
+        #     self.conn = pymysql.connect(host=ip,
+        #                            port=pt,
+        #                            user=user,
+        #                            password=psd,
+        #                            database=db_name,
+        #                            charset=charset,
+        #                            )
+        #     self.cur = self.conn.cursor()
+        # except Exception as E:
+        #     raise E
+        # else:
+        #     print(f'数据库{db_name}连接成功!!!!!!')
 
     # 创建数据库
     def create_dbname(self,ip,user,psd,db_name,pt):
         try:
-            conn = pymysql.connect(host=ip, user=user, password=psd, port=pt)
-            cur = conn.cursor()
-            is_exist = cur.execute(f"SHOW DATABASES LIKE '{db_name}'")
+            self.conn = pymysql.connect(host=ip, user=user, password=psd, port=pt)
+            self.cur = self.conn.cursor()
+            is_exist = self.cur.execute(f"SHOW DATABASES LIKE '{db_name}'")
             if not is_exist:
-                cur.execute(f'CREATE DATABASE IF NOT EXISTS {db_name} DEFAULT CHARSET utf8 COLLATE utf8_general_ci')
+                self.cur.execute(f'CREATE DATABASE IF NOT EXISTS {db_name} DEFAULT CHARSET utf8 COLLATE utf8_general_ci')
+                self.conn.commit()
                 print(f'数据库{db_name}创建成功!!!!!!')
             else:
                 print(f'数据库{db_name}已存在，无需创建!!!!!!')
+            self.cur.execute(f'use {db_name}')
+            sql = 'select * from steelrecord LIMIT 1000'
+            # self.cur.execute('select * from steelrecord LIMIT 1000')
+            # res = self.cur.fetchall()
+            # print(list(res))
+            res = self.ss_bs(sql)
+            print(res)
         except Exception as E:
             raise E
         else:
-            cur.close()
-            conn.close()
+            self.close_()
 
 
 
@@ -51,7 +58,8 @@ class DbMysqlOp:
 
     def ss_bs(self,sql):
         try:
-            bs_result = self.cur.execute(str(sql)).fetchall()
+            self.cur.execute(str(sql))
+            bs_result = self.cur.fetchall()
             self.conn.commit()
             return bs_result
         except Exception as E:
@@ -107,7 +115,7 @@ if __name__ == '__main__':
               ip='127.0.0.1',
               user='root',
               psd='nercar',
-              db_name='temp',
+              db_name='ncdcoldstrip',
               )
 
 

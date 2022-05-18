@@ -36,7 +36,8 @@ class DbMysqlOp:
 
     def ss_bs(self,sql):
         try:
-            bs_result = self.cur.execute(str(sql)).fetchall()
+            self.cur.execute(str(sql))
+            bs_result = self.cur.fetchall()
             self.conn.commit()
             return bs_result
         except Exception as E:
