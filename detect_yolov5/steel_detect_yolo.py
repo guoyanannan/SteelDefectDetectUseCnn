@@ -223,12 +223,12 @@ class YOLOInit(nn.Module):
             x2_roi,y2_roi = x1_roi+(x2-x1),y1_roi+(y2-y1)
             img_roi = img_split[y1_cut:y2_cut,x1_cut:x2_cut]
             if not schema:
-                if abs(x2-x1) > 30:
-                    img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
-                    x1_roi,x2_roi = x1_roi//3, x2_roi//3
                 if abs(x2-x1)*abs(y2-y1) >= 1024 * 1024:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//4, img_roi.shape[0]//4))
                     x1_roi, y1_roi, x2_roi, y2_roi = x1_roi//4, y1_roi//4, x2_roi//4, y2_roi//4
+                elif abs(x2-x1) > 30:
+                    img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
+                    x1_roi,x2_roi = x1_roi//3, x2_roi//3
                 if debug:
                     img_roi_draw = cv2.cvtColor(img_roi, cv2.COLOR_GRAY2RGB)
                     cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3,lineType=cv2.LINE_AA)

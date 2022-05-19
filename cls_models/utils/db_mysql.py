@@ -42,9 +42,6 @@ class DbMysqlOp:
         else:
             self.close_()
 
-
-
-
     # 查询
     def ss_latest_one(self,sql):
         try:
