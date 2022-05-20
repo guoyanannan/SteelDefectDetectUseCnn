@@ -5,5 +5,6 @@ def main():
     opt = parse_opt()
     run(**vars(opt))
 
+
 if __name__ == '__main__':
     main()

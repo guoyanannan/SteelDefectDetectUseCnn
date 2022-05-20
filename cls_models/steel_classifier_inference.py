@@ -1,7 +1,9 @@
 import yaml
 import argparse
+import os
 from cls_models.utils.get_file_info import LOGS
-from cls_models.utils.common_oper import select_device
+from cls_models.steel_classifier_init import ClassificationAlgorithm
+from cls_models.utils.common_oper import select_device, select_no_img
 
 
 def run(
@@ -26,6 +28,16 @@ def run(
     logs_oper = LOGS(log_path)
     ss = select_device(device)
     logs_oper.info(ss)
+    clssifer_model = ClassificationAlgorithm(xml_path=xml,
+                                             ini_path=ini,
+                                             batch_size=bs,
+                                             model_path=weights,
+                                             dynamic_size=dynamic_size,
+                                             op_log=logs_oper)
+    files_path = [os.path.join(rois_dir, fileName) for fileName in os.listdir(rois_dir)]
+    files_path = select_no_img(files_path,os.path.basename(rois_dir))
+    if files_path:
+        pass
     # print(weights)
     # print(ini)
     # print(xml)
