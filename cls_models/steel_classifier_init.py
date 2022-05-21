@@ -37,8 +37,8 @@ class ClassificationAlgorithm(ReadConvertFile):
         if image_arr is not None:
             return image_arr
         else:
-            self.op_log.info('当前批次读取数据为空,请检查!')
-            return None
+            self.op_log.info(f'当前批次共{len(batch_img_path)}张图片数据，有效数量为 0 请检查!')
+            raise
 
     def create_model(self):
         if self.ModelName in ('inception_v3','InceptionV3'):
@@ -95,6 +95,7 @@ class ClassificationAlgorithm(ReadConvertFile):
             self.model = Model(inputs=base_model.input, outputs=predictions)
         try:
             load_status = self.model.load_weights(self.model_path)
+            self.model
             self.model.summary()
             self.op_log.info(f'{self.ModelName}模型加载成功')
         except Exception as EEer:
@@ -103,14 +104,13 @@ class ClassificationAlgorithm(ReadConvertFile):
 
     def inference(self, batch_path):
         img_arr_bs = self.img_proces(batch_path)
-        if img_arr_bs:
-            results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
-            scores = results.max(axis=1).astype('float16')
-            inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
-            cls_name = [self.inter_and_name[i] for i in inter_no]
-            enter_no = [self.inter_and_exter[i] for i in inter_no]
-            total_result_iter = zip(batch_path,cls_name,inter_no,enter_no,scores)
-            return total_result_iter
+        results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
+        scores = results.max(axis=1).astype('float16')
+        inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
+        cls_name = [self.inter_and_name[i] for i in inter_no]
+        enter_no = [self.inter_and_exter[i] for i in inter_no]
+        total_result_iter = zip(batch_path,cls_name,inter_no,enter_no,scores)
+        return total_result_iter
     # def ClsInference(self):
     #     img_path = self.img_path
     #     bs = self.bs

@@ -226,7 +226,7 @@ class YOLOInit(nn.Module):
                 if abs(x2-x1)*abs(y2-y1) >= 1024 * 1024:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//4, img_roi.shape[0]//4))
                     x1_roi, y1_roi, x2_roi, y2_roi = x1_roi//4, y1_roi//4, x2_roi//4, y2_roi//4
-                elif abs(x2-x1) > 30:
+                elif abs(x2-x1) >= 512:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
                     x1_roi,x2_roi = x1_roi//3, x2_roi//3
                 if debug:

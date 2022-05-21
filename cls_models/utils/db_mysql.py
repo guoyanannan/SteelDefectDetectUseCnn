@@ -1,13 +1,14 @@
 import pymysql
-from common_oper import re_print
+from cls_models.utils.common_oper import re_print
 
 
 class DbMysqlOp:
-    def __init__(self,ip,user,psd,db_name,charset='utf8',pt=3306):
+    def __init__(self,ip,user,psd,db_name,logs_oper,charset='utf8',pt=3306):
         self.ip = ip
         self.user = user
         self.psd = psd
         self.db_name = db_name
+        self.loger = logs_oper
         self.pt = pt
         self.charset = charset
         self.create_dbname()
@@ -33,9 +34,9 @@ class DbMysqlOp:
             is_exist = self.cur.execute(f"SHOW DATABASES LIKE '{self.db_name}'")
             if not is_exist:
                 self.cur.execute(f'CREATE DATABASE IF NOT EXISTS {self.db_name} DEFAULT CHARSET utf8 COLLATE utf8_general_ci')
-                re_print(f'数据库{self.db_name}创建成功')
+                self.loger.info(f'数据库{self.db_name}创建成功')
             else:
-                re_print(f'数据库{self.db_name}已存在，无需创建')
+                self.loger.info(f'数据库{self.db_name}已存在，无需创建')
             self.cur.execute(f'use {self.db_name}')
             self.conn.commit()
         except Exception as E:
@@ -78,9 +79,9 @@ class DbMysqlOp:
                     ENGINE=InnoDB\
                     "
                 self.cur.execute(sql_cl)
-                re_print(f'{self.db_name}.{tabel_name}创建成功')
+                self.loger.info(f'{self.db_name}.{tabel_name}创建成功')
             else:
-                re_print(f'{self.db_name}.{tabel_name}已存在，无需创建')
+                self.loger.info(f'{self.db_name}.{tabel_name}已存在，无需创建')
             self.conn.commit()
         except Exception as E:
             self.close_()
@@ -148,7 +149,38 @@ class DbMysqlOp:
         self.conn.close()
 
 
+def get_camdefect_no(ip,user,psd,dbname,tabels:tuple,logs_oper):
+    db_oper = DbMysqlOp(
+        ip=ip,
+        user=user,
+        psd=psd,
+        db_name=dbname,
+        logs_oper=logs_oper,
+    )
+    defects_info = {}
+    for i in range(1,len(tabels)+1):
+        defects_info[str(i)] = 0
+    for tabel_name in tabels:
+        sql_cam = f'SELECT * FROM {tabel_name} ORDER BY ID DESC LIMIT 0,1'
+        infos = db_oper.ss_latest_one(sql_cam)
+        if infos:
+            defect_id,cam_id = infos[1:3]
+            defects_info[str(cam_id)]=defect_id
+    db_oper.close_()
+    return defects_info
 
+
+def check_temp_db(ip,user,psd,dbname,tabels:tuple,logs_oper):
+    db_oper = DbMysqlOp(
+        ip=ip,
+        user=user,
+        psd=psd,
+        db_name=dbname,
+        logs_oper=logs_oper,
+    )
+    for tabel_name in tabels:
+        db_oper.create_dbtabel(tabel_name)
+    db_oper.close_()
 
 if __name__ == '__main__':
     # ip,user,psd,db_name
