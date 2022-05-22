@@ -77,7 +77,8 @@ def run(
                                                op_log=logs_oper)
 
     while True:
-        files_path = [os.path.join(rois_dir, fileName) for fileName in os.listdir(rois_dir)]
+        file_name_list = sorted(os.listdir(rois_dir), key=lambda x: os.path.getmtime(os.path.join(rois_dir, x)))
+        files_path = [os.path.join(rois_dir, fileName) for fileName in file_name_list]
         files_path = select_no_img(files_path, os.path.basename(rois_dir))
         if files_path:
             num_bs = math.ceil(len(files_path)/bs)
