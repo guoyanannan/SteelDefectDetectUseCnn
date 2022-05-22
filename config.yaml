@@ -44,6 +44,7 @@ classifier:
     logs: './arith_logs/classifier_logs'
     input: './result_roi_8k'
     # 主要用于分类结果的存储，便于样本的收集
+    internal_number: ()
     offline_result: './classification_result'
     # 新平台需要将数据保存的目录,有几个相机就对应有几个
     schema:
@@ -67,6 +68,12 @@ classifier:
       camera2: 'camdefect2'
   infoParameter:
     bs: 16
+    # 数据库中为背景的类别ID(字段class:0)
+    negative: 0
+    # 忽略分数
+    score_ignore: 50
+    #相机数
+    cam_num: 2
     # 0.1.2.3 or cpu
     device: '0'
     dynamicsize: False

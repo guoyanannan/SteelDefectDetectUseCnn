@@ -7,7 +7,7 @@ from cls_models.models.inception_v3 import InceptionV3
 from cls_models.models.efficientnet import EfficientNetB2,EfficientNetB3,EfficientNetB4,EfficientNetB5
 from cls_models.models.resnet_common import ResNeXt50,ResNet50
 from cls_models.models.nasnet import NASNetLarge,NASNet
-from cls_models.utils.common_oper import re_print
+from cls_models.utils.common_oper import re_print,delete_batch_file
 from tensorflow.keras.layers import *
 from tensorflow.keras.models import Model
 
@@ -25,17 +25,20 @@ class ClassificationAlgorithm(ReadConvertFile):
 
     def img_proces(self, batch_img_path):
         image_arr = []
+        image_list = []
         for filename in batch_img_path:
             img = Image.open(filename)
+            image_list.append(np.array(img))
             img = img.convert('RGB')
             img = img.resize((self.imgsize, self.imgsize))
             img = np.array(img)
             img = img / 255
             image_arr.append(img)
         image_arr = np.array(image_arr)
-        re_print(f'image_arr_shape:{image_arr.shape}')
+        re_print(f'image_arr_shape:{image_arr.shape},image_list:{len(image_list)}')
+        delete_batch_file(batch_img_path)
         if image_arr is not None:
-            return image_arr
+            return image_arr,image_list
         else:
             self.op_log.info(f'当前批次共{len(batch_img_path)}张图片数据，有效数量为 0 请检查!')
             raise
@@ -95,21 +98,19 @@ class ClassificationAlgorithm(ReadConvertFile):
             self.model = Model(inputs=base_model.input, outputs=predictions)
         try:
             load_status = self.model.load_weights(self.model_path)
-            self.model
-            self.model.summary()
             self.op_log.info(f'{self.ModelName}模型加载成功')
         except Exception as EEer:
             self.op_log.info('模型加载失败，错误信息：{}'.format(EEer))
             raise EEer
 
     def inference(self, batch_path):
-        img_arr_bs = self.img_proces(batch_path)
+        img_arr_bs,img_list = self.img_proces(batch_path)
         results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
-        scores = results.max(axis=1).astype('float16')
+        scores = results.max(axis=1).astype('float16') * 100
         inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
         cls_name = [self.inter_and_name[i] for i in inter_no]
         enter_no = [self.inter_and_exter[i] for i in inter_no]
-        total_result_iter = zip(batch_path,cls_name,inter_no,enter_no,scores)
+        total_result_iter = zip(batch_path,img_list,cls_name,inter_no,enter_no,scores)
         return total_result_iter
     # def ClsInference(self):
     #     img_path = self.img_path
