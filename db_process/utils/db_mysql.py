@@ -279,7 +279,7 @@ def read_defect_from_tabel(ip,user,psd,logs_oper,table_r,table_w,db_name_r,db_na
             oper.switch_db(db_name_r)
             delete_sql = F'DELETE FROM {table_r} WHERE defectID BETWEEN {start_defectId} AND {end_defectId}'
             oper.delete_(delete_sql)
-            re_print.info(f'成功删除{db_name_r}.{table_r}: [{end_defectId-start_defectId+1}] 条记录')
+            re_print(f'成功删除{db_name_r}.{table_r}: [{end_defectId-start_defectId+1}] 条记录')
 
 
 if __name__ == '__main__':

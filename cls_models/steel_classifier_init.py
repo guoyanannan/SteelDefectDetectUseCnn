@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from PIL import Image
 from cls_models.utils.get_file_info import ReadConvertFile
@@ -104,13 +106,18 @@ class ClassificationAlgorithm(ReadConvertFile):
             raise
 
     def inference(self, batch_path):
+        v1 = time.time()
         img_arr_bs,img_list = self.img_proces(batch_path)
+        v2 = time.time()
         results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
+        v3 = time.time()
         scores = results.max(axis=1).astype('float16') * 100
         inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
         cls_name = [self.inter_and_name[i] for i in inter_no]
         enter_no = [self.inter_and_exter[i] for i in inter_no]
         total_result_iter = zip(batch_path,img_list,cls_name,inter_no,enter_no,scores)
+        v4 = time.time()
+        re_print(f'读取加模型预测加结果整理共耗时：{v4-v1}s,读取{v2-v1}s,推理{v3-v2}s,整理{v4-v3}s')
         return total_result_iter
     # def ClsInference(self):
     #     img_path = self.img_path

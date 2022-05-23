@@ -82,14 +82,19 @@ def run(
         while True:
             if not debug:
                 db_oper_ = get_dbop(db_ip,db_user,db_psd,temp_db['db_name'],logs_oper)
+            v1 = time.time()
             file_name_list = sorted(os.listdir(rois_dir), key=lambda x: os.path.getmtime(os.path.join(rois_dir, x)))
             files_path = [os.path.join(rois_dir, fileName) for fileName in file_name_list]
             files_path = select_no_img(files_path, os.path.basename(rois_dir))
+            v2 = time.time()
+            re_print(f'路径整理时间: {v2-v1} s')
             if files_path:
                 num_bs = math.ceil(len(files_path)/bs)
                 for i in range(num_bs):
+                    v21 = time.time()
                     batch_img_path = files_path[i * bs:(i + 1) * bs]
                     batch_result_iter = classifier_model.inference(batch_img_path)
+                    v22 = time.time()
                     defect_cam_num, db_defects_info = parse_data(batch_result_iter,
                                                                  save_intercls,
                                                                  offline_result,
@@ -104,7 +109,10 @@ def run(
                             num += len(info)
                         re_print(f'采用非数据库形式存储当前批次共{num}条信息: {db_defects_info}')
                     else:
+                        v3 = time.time()
                         write_defect_to_table(db_oper_,db_defects_info,temp_tables)
+                        v4 = time.time()
+                        #re_print(f'读取加模型预测加结果整理共耗时：{v4 - v21}s,读取推理{v22 - v21}s，存入共享加整理{v3-v22}s,数据库写入{v4-v3}s')
             else:
                 if bool(db_oper_):
                     db_oper_.close_()

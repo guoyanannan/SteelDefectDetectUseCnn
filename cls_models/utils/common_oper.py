@@ -30,7 +30,7 @@ def select_device(device,batch_size=0, newline=True):
         tf.config.experimental.set_memory_growth(physical_devices[int(device)], True)
         tf.config.experimental.set_virtual_device_configuration(
             physical_devices[int(device)],
-            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=3072)]
+            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
         )
         s += f'GPU:{device} '
     cuda = not cpu
