@@ -1,11 +1,12 @@
 import os
+import time
 import yaml
 import math
 import argparse
 from cls_models.utils.get_file_info import LOGS
-from cls_models.utils.db_mysql import get_camdefect_no,check_temp_db
+from cls_models.utils.db_mysql import get_camdefect_no,check_temp_db,get_dbop,write_defect_to_table
 from cls_models.steel_classifier_init import ClassificationAlgorithm
-from cls_models.utils.common_oper import select_device, select_no_img,parse_data
+from cls_models.utils.common_oper import select_device, select_no_img,parse_data,re_print
 
 
 def run(
@@ -30,108 +31,86 @@ def run(
         transfers="{'db_name': 'temp', 'camera1': 'tempcam1', 'camera2': 'tempcam2'}",
         using="{'db_name': 'ncdcoldstripdefect', 'camera1': 'camdefect1', 'camera2': 'camdefect2'}",
         ):
-
     logs_oper = LOGS(log_path)
     ss = select_device(device)
     logs_oper.info(ss)
-    curr_schema = eval(schema)
     try:
-        cam_defect_dir = tuple([curr_schema[f'camera{i}'] for i in range(1, cam_num + 1)])
+        curr_schema = eval(schema)
+        try:
+            cam_defect_dir = tuple([curr_schema[f'camera{i}'] for i in range(1, cam_num + 1)])
+        except Exception as E:
+            logs_oper.info(f'相机路径数量和相机数不一致，请检查参数 schema 和 cam_num 设置，Error:{E}')
+            raise
+        if not debug:
+            # 查看临时库和表是否存在，不存在就创建
+            temp_db = eval(transfers)
+            try:
+                temp_tables = tuple([temp_db[f'camera{i}'] for i in range(1,cam_num+1)])
+            except Exception as E:
+                logs_oper.info(f'临时表数量和相机数不一致，请检查参数 transfers 和 cam_num 设置，Error:{E}')
+                raise
+            check_temp_db(db_ip, db_user, db_psd, temp_db['db_name'], temp_tables,logs_oper)
+            # 查询临时表里面的缺陷数
+            temp_defect_no_info = get_camdefect_no(db_ip, db_user, db_psd, temp_db['db_name'], temp_tables,logs_oper)
+            # 查询正式表里面的缺陷数
+            use_db = eval(using)
+            try:
+                use_tables = tuple([use_db[f'camera{i}'] for i in range(1,cam_num+1)])
+            except Exception as E:
+                logs_oper.info(f'正式表数量和相机数不一致，请检查参数 using 和 cam_num 设置，Error:{E}')
+                raise
+            defect_no_info = get_camdefect_no(db_ip,db_user,db_psd,use_db['db_name'],use_tables,logs_oper)
+            # 以记录最大为开始计数
+            defect_cam_num = {}
+            for i in range(1,len(defect_no_info)+1):
+                defect_cam_num[str(i)]=max(temp_defect_no_info[str(i)],defect_no_info[str(i)])
+            logs_oper.info(f'程序启动时各相机缺陷数量{defect_cam_num}')
+        else:
+            defect_cam_num = {}
+            for i in range(1,cam_num+1):
+                defect_cam_num[str(i)] = 0
+
+        classifier_model = ClassificationAlgorithm(xml_path=xml,
+                                                   ini_path=ini,
+                                                   batch_size=bs,
+                                                   model_path=weights,
+                                                   dynamic_size=dynamic_size,
+                                                   op_log=logs_oper)
+
+        while True:
+            if not debug:
+                db_oper_ = get_dbop(db_ip,db_user,db_psd,temp_db['db_name'],logs_oper)
+            file_name_list = sorted(os.listdir(rois_dir), key=lambda x: os.path.getmtime(os.path.join(rois_dir, x)))
+            files_path = [os.path.join(rois_dir, fileName) for fileName in file_name_list]
+            files_path = select_no_img(files_path, os.path.basename(rois_dir))
+            if files_path:
+                num_bs = math.ceil(len(files_path)/bs)
+                for i in range(num_bs):
+                    batch_img_path = files_path[i * bs:(i + 1) * bs]
+                    batch_result_iter = classifier_model.inference(batch_img_path)
+                    defect_cam_num, db_defects_info = parse_data(batch_result_iter,
+                                                                 save_intercls,
+                                                                 offline_result,
+                                                                 defect_cam_num,
+                                                                 negative,
+                                                                 ignore,
+                                                                 curr_schema
+                                                                 )
+                    if debug:
+                        num = 0
+                        for info in db_defects_info:
+                            num += len(info)
+                        re_print(f'采用非数据库形式存储当前批次共{num}条信息: {db_defects_info}')
+                    else:
+                        write_defect_to_table(db_oper_,db_defects_info,temp_tables)
+            else:
+                if bool(db_oper_):
+                    db_oper_.close_()
+                re_print(f'目录[{os.path.basename(rois_dir)}]暂时没有数据了,等待')
+                time.sleep(1)
     except Exception as E:
-        logs_oper.info(f'相机路径数量和相机数不一致，请检查参数 schema 和 cam_num 设置，Error:{E}')
-        raise
-    if not debug:
-        # 查看临时库和表是否存在，不存在就创建
-        temp_db = eval(transfers)
-        try:
-            temp_tables = tuple([temp_db[f'camera{i}'] for i in range(1,cam_num+1)])
-        except Exception as E:
-            logs_oper.info(f'临时表数量和相机数不一致，请检查参数 transfers 和 cam_num 设置，Error:{E}')
-            raise
-        check_temp_db(db_ip, db_user, db_psd, temp_db['db_name'], temp_tables,logs_oper)
-        # 查询临时表里面的缺陷数
-        temp_defect_no_info = get_camdefect_no(db_ip, db_user, db_psd, temp_db['db_name'], temp_tables,logs_oper)
-        # 查询正式表里面的缺陷数
-        use_db = eval(using)
-        try:
-            use_tables = tuple([use_db[f'camera{i}'] for i in range(1,cam_num+1)])
-        except Exception as E:
-            logs_oper.info(f'正式表数量和相机数不一致，请检查参数 using 和 cam_num 设置，Error:{E}')
-            raise
-        defect_no_info = get_camdefect_no(db_ip,db_user,db_psd,use_db['db_name'],use_tables,logs_oper)
-        # 以记录最大为开始计数
-        defect_cam_num = {}
-        for i in range(1,len(defect_no_info)+1):
-            defect_cam_num[str(i)]=max(temp_defect_no_info[str(i)],defect_no_info[str(i)])
-        logs_oper.info(f'程序启动时各相机缺陷数量{defect_cam_num}')
-    else:
-        defect_cam_num = {}
-        for i in range(1,cam_num+1):
-            defect_cam_num[str(i)] = 0
-
-    classifier_model = ClassificationAlgorithm(xml_path=xml,
-                                               ini_path=ini,
-                                               batch_size=bs,
-                                               model_path=weights,
-                                               dynamic_size=dynamic_size,
-                                               op_log=logs_oper)
-
-    while True:
-        file_name_list = sorted(os.listdir(rois_dir), key=lambda x: os.path.getmtime(os.path.join(rois_dir, x)))
-        files_path = [os.path.join(rois_dir, fileName) for fileName in file_name_list]
-        files_path = select_no_img(files_path, os.path.basename(rois_dir))
-        if files_path:
-            num_bs = math.ceil(len(files_path)/bs)
-            for i in range(num_bs):
-                batch_img_path = files_path[i * bs:(i + 1) * bs]
-                batch_result_iter = classifier_model.inference(batch_img_path)
-                defect_cam_num, db_defects_info = parse_data(batch_result_iter,
-                                                             save_intercls,
-                                                             offline_result,
-                                                             defect_cam_num,
-                                                             negative,
-                                                             ignore,
-                                                             curr_schema
-                                                             )
-                print('defect_cam_num: ',defect_cam_num)
-                for i in db_defects_info:
-                    print('db_defects_info: ',i)
-                exit()
-                # print(list(batch_result_iter))
-                # exit()
-                # for infos in batch_result_iter:
-                #     img_path, img_roi, class_name, internal_no, external_no, score = infos
-                #     _,steel_no,cam_no,img_no,left_edge,right_edge,\
-                #     roi_x1,roi_x2,roi_y1,roi_y2,\
-                #     img_x1,img_x2,img_y1,img_y2,\
-                #     steel_x1,steelx2,steel_y1,steel_y2,_ = os.path.basename(img_path).split('_')
-                #     if int(internal_no) in save_intercls:
-                #         savedir_intercls = os.path.join(offline_result,internal_no)
-                #         if not os.path.exists(savedir_intercls)
-                #         if debug:
-                #             img_name = f'{class_name}_score{score}' #os.path.basename(img_path)
-                #             new_path = os.path.join(offline_result,img_name)
-
-
-
-
-
-    # print(weights)
-    # print(ini)
-    # print(xml)
-    # print(log_path)
-    # print(rois_dir)
-    # print(offline_result)
-    # print(schema)
-    # print(bs)
-    # print(device)
-    # print(dynamic_size)
-    # print(debug)
-    # print(db_ip)
-    # print(db_user)
-    # print(db_psd)
-    # print(transfers)
-    # print(using)
+        logs_oper.info(E)
+        raise Exception(f'{E}')
 
 
 def parse_opt():

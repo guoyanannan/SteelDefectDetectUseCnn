@@ -35,7 +35,7 @@ class ClassificationAlgorithm(ReadConvertFile):
             img = img / 255
             image_arr.append(img)
         image_arr = np.array(image_arr)
-        re_print(f'image_arr_shape:{image_arr.shape},image_list:{len(image_list)}')
+        re_print(f'当前批次输入形状:[{image_arr.shape}],缓存数量:[{len(image_list)}]')
         delete_batch_file(batch_img_path)
         if image_arr is not None:
             return image_arr,image_list
@@ -101,7 +101,7 @@ class ClassificationAlgorithm(ReadConvertFile):
             self.op_log.info(f'{self.ModelName}模型加载成功')
         except Exception as EEer:
             self.op_log.info('模型加载失败，错误信息：{}'.format(EEer))
-            raise EEer
+            raise
 
     def inference(self, batch_path):
         img_arr_bs,img_list = self.img_proces(batch_path)

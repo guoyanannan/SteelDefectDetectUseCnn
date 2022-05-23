@@ -36,7 +36,8 @@ class DbMysqlOp:
                 self.cur.execute(f'CREATE DATABASE IF NOT EXISTS {self.db_name} DEFAULT CHARSET utf8 COLLATE utf8_general_ci')
                 self.loger.info(f'数据库{self.db_name}创建成功')
             else:
-                self.loger.info(f'数据库{self.db_name}已存在，无需创建')
+                # self.loger.info(f'数据库{self.db_name}已存在，无需创建')
+                pass
             self.cur.execute(f'use {self.db_name}')
             self.conn.commit()
         except Exception as E:
@@ -109,16 +110,16 @@ class DbMysqlOp:
             raise E
 
     # 插入
-    def insert_(self,sql,param):
+    def insert_(self,sql,table_name,param):
         try:
-            self.cur.execute(str(sql),param)
+            self.cur.executemany(str(sql),param)
             self.conn.commit()
         except Exception as E:
             self.conn.rollback()
             self.close_()
             raise E
         else:
-            re_print(f'插入{len(param)}条数据成功!!!!!!')
+            re_print(f'表[{table_name}]插入[{len(param)}]条数据成功')
 
     # 删除
     def delete_(self,sql):
@@ -130,8 +131,7 @@ class DbMysqlOp:
             self.close_()
             raise E
         else:
-            re_print(f'删除记录成功!!!!!!')
-
+            re_print(f'删除记录成功')
     # 更新
     def updata_(self,sql):
         try:
@@ -142,14 +142,14 @@ class DbMysqlOp:
             self.conn.rollback()
             raise E
         else:
-            re_print(f'更新记录成功!!!!!!')
+            re_print(f'更新记录成功')
 
     def close_(self):
         self.cur.close()
         self.conn.close()
 
 
-def get_camdefect_no(ip,user,psd,dbname,tabels:tuple,logs_oper):
+def get_camdefect_no(ip,user,psd,dbname,tables:tuple,logs_oper):
     db_oper = DbMysqlOp(
         ip=ip,
         user=user,
@@ -158,9 +158,9 @@ def get_camdefect_no(ip,user,psd,dbname,tabels:tuple,logs_oper):
         logs_oper=logs_oper,
     )
     defects_info = {}
-    for i in range(1,len(tabels)+1):
+    for i in range(1,len(tables)+1):
         defects_info[str(i)] = 0
-    for tabel_name in tabels:
+    for tabel_name in tables:
         sql_cam = f'SELECT * FROM {tabel_name} ORDER BY ID DESC LIMIT 0,1'
         infos = db_oper.ss_latest_one(sql_cam)
         if infos:
@@ -170,7 +170,7 @@ def get_camdefect_no(ip,user,psd,dbname,tabels:tuple,logs_oper):
     return defects_info
 
 
-def check_temp_db(ip,user,psd,dbname,tabels:tuple,logs_oper):
+def check_temp_db(ip,user,psd,dbname,tables:tuple,logs_oper):
     db_oper = DbMysqlOp(
         ip=ip,
         user=user,
@@ -178,9 +178,35 @@ def check_temp_db(ip,user,psd,dbname,tabels:tuple,logs_oper):
         db_name=dbname,
         logs_oper=logs_oper,
     )
-    for tabel_name in tabels:
+    for tabel_name in tables:
         db_oper.create_dbtabel(tabel_name)
     db_oper.close_()
+
+
+def get_dbop(ip,user,psd,dbname,logs_oper):
+    db_oper = DbMysqlOp(
+        ip=ip,
+        user=user,
+        psd=psd,
+        db_name=dbname,
+        logs_oper=logs_oper,
+    )
+    return db_oper
+
+
+def write_defect_to_table(oper,defect_info,tables:tuple):
+    for i in range(0,len(defect_info)):
+        insert_sql = f'INSERT INTO {tables[i]} (defectID,camNo,seqNo,imgIndex,defectClass,' \
+                     f'leftInImg,rightInImg,topInImg,bottomInImg,' \
+                     f'leftInSrcImg,rightInSrcImg,topInSrcImg,bottomInSrcImg,' \
+                     f'leftInObj,rightInObj,topInObj,bottomInObj,' \
+                     f'grade,area,leftToEdge,rightToEdge,cycle) VALUES(%s,%s,%s,%s,%s,' \
+                     f'%s,%s,%s,%s,' \
+                     f'%s,%s,%s,%s,' \
+                     f'%s,%s,%s,%s,' \
+                     f'%s,%s,%s,%s,%s)'
+        oper.insert_(insert_sql,tables[i],defect_info[i])
+
 
 if __name__ == '__main__':
     # ip,user,psd,db_name

@@ -105,7 +105,7 @@ def delete_batch_file(batch_path):
 
 
 def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_ignore,score_ignore,curr_schema):
-    defect_infos = []
+    defect_infos = [[] for i in range(len(curr_defect_cam_num))]
     for infos in info_iter:
         img_path, img_roi, class_name, internal_no, external_no, score = infos
         _, steel_no, cam_no, img_no, left_edge, right_edge, \
@@ -177,11 +177,12 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
                                  int(rightToEdge),
                                  int(cycle)
                                  )
-                defect_infos.append(curr_roi_info)
+                defect_infos[int(cam_no)-1].append(curr_roi_info)
             except Exception as E:
                 re_print(E)
             else:
                 curr_defect_cam_num[cam_no] = defect_id
+    defect_infos = [tuple(ls) for ls in defect_infos]
     return curr_defect_cam_num,tuple(defect_infos)
 
 
