@@ -78,3 +78,24 @@ classifier:
     device: '0'
     dynamicsize: False
     debug: False
+# 数据库中信息后处理
+dbinfoprocess:
+  filePath:
+    logs: './arith_logs/data_pprocess_logs'
+  dbInfo:
+    db_ip: '127.0.0.1'
+    db_user: 'root'
+    db_psd: 'nercar'
+    # 中转站临时库和表
+    transfers:
+      db_name: 'temp'
+      camera1: 'tempcam1'
+      camera2: 'tempcam2'
+    # 正式表和库
+    using:
+      db_name: 'ncdcoldstripdefect'
+      camera1: 'camdefect1'
+      camera2: 'camdefect2'
+  infoParameter:
+    #相机数
+    cam_num: 2

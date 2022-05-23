@@ -6,7 +6,7 @@ import argparse
 from cls_models.utils.get_file_info import LOGS
 from cls_models.utils.db_mysql import get_camdefect_no,check_temp_db,get_dbop,write_defect_to_table
 from cls_models.steel_classifier_init import ClassificationAlgorithm
-from cls_models.utils.common_oper import select_device, select_no_img,parse_data,re_print
+from cls_models.utils.common_oper import select_device, select_no_img,parse_data,re_print,delete_dir
 
 
 def run(
@@ -34,6 +34,8 @@ def run(
     logs_oper = LOGS(log_path)
     ss = select_device(device)
     logs_oper.info(ss)
+    if not debug:
+        delete_dir(rois_dir)
     try:
         curr_schema = eval(schema)
         try:
@@ -63,7 +65,7 @@ def run(
             # 以记录最大为开始计数
             defect_cam_num = {}
             for i in range(1,len(defect_no_info)+1):
-                defect_cam_num[str(i)]=max(temp_defect_no_info[str(i)],defect_no_info[str(i)])
+                defect_cam_num[str(i)] = max(temp_defect_no_info[str(i)],defect_no_info[str(i)])
             logs_oper.info(f'程序启动时各相机缺陷数量{defect_cam_num}')
         else:
             defect_cam_num = {}

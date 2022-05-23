@@ -1,5 +1,7 @@
+import time
+
 import pymysql
-from cls_models.utils.common_oper import re_print
+from db_process.utils.common_oper import re_print
 
 
 class DbMysqlOp:
@@ -43,6 +45,15 @@ class DbMysqlOp:
         except Exception as E:
             self.loger.info(E)
             raise
+
+    def switch_db(self,db_name):
+        try:
+            self.cur.execute(f'use {db_name}')
+            self.conn.commit()
+        except Exception as E:
+            self.loger.info(E)
+            raise
+
 
     # 创建表
     def create_dbtabel(self, tabel_name):
@@ -215,7 +226,65 @@ def write_defect_to_table(oper,defect_info,tables:tuple):
         oper.insert_(insert_sql,tables[i],defect_info[i])
 
 
+def write_defect_to_cam_table(oper,defect_info,table):
+    insert_sql = f'INSERT INTO {table} (defectID,camNo,seqNo,imgIndex,defectClass,' \
+                 f'leftInImg,rightInImg,topInImg,bottomInImg,' \
+                 f'leftInSrcImg,rightInSrcImg,topInSrcImg,bottomInSrcImg,' \
+                 f'leftInObj,rightInObj,topInObj,bottomInObj,' \
+                 f'grade,area,leftToEdge,rightToEdge,cycle) VALUES(%s,%s,%s,%s,%s,' \
+                 f'%s,%s,%s,%s,' \
+                 f'%s,%s,%s,%s,' \
+                 f'%s,%s,%s,%s,' \
+                 f'%s,%s,%s,%s,%s)'
+    oper.insert_(insert_sql,table,defect_info)
+
+
+def read_defect_from_tabel(ip,user,psd,logs_oper,table_r,table_w,db_name_r,db_name_w):
+    oper = get_dbop(ip, user, psd, db_name_r, logs_oper)
+    total_time = 0  # 单位s
+    while True:
+        try:
+            if total_time == 60*60:
+                try:
+                    oper.close_()
+                except:
+                    pass
+                finally:
+                    oper = get_dbop(ip, user, psd, db_name_r, logs_oper)
+                    total_time = 0
+
+            select_sql = f'SELECT defectID,camNo,seqNo,imgIndex,defectClass,' \
+                         f'leftInImg,rightInImg,topInImg,bottomInImg,' \
+                         f'leftInSrcImg,rightInSrcImg,topInSrcImg,bottomInSrcImg,' \
+                         f'leftInObj,rightInObj,topInObj,bottomInObj,' \
+                         f'grade,area,leftToEdge,rightToEdge,cycle FROM {table_r} LIMIT 200'
+            need_bs = oper.ss_bs(select_sql)
+            if len(need_bs):
+                start_defectId = need_bs[0][0]
+                end_defectId = need_bs[-1][0]
+                oper.switch_db(db_name_w)
+                write_defect_to_cam_table(oper,need_bs,table_w)
+            else:
+                total_time += 1
+                re_print(f'{db_name_r}.{table_r}暂时没有缺陷记录，等待')
+                time.sleep(1)
+                continue
+        except Exception as E:
+            oper.loger.info(E)
+            if bool(oper):
+                oper.close_()
+            raise
+        else:
+            re_print(f'读取{db_name_r}.{table_r}: [{len(need_bs)}] 条数据，并成功写入{db_name_w}.{table_w}: [{len(need_bs)}] 条数据')
+            oper.switch_db(db_name_r)
+            delete_sql = F'DELETE FROM {table_r} WHERE defectID BETWEEN {start_defectId} AND {end_defectId}'
+            oper.delete_(delete_sql)
+            re_print.info(f'成功删除{db_name_r}.{table_r}: [{end_defectId-start_defectId+1}] 条记录')
+
+
 if __name__ == '__main__':
+    # test
+    import logging
     # ip,user,psd,db_name
     dop = DbMysqlOp(
               ip='127.0.0.1',
@@ -223,9 +292,12 @@ if __name__ == '__main__':
               psd='nercar',
               # db_name='ncdcoldstrip',
               db_name='temp',
+              logs_oper=logging,
               )
 
-    dop.create_dbtabel('tempcam1')
+    dop.create_dbtabel('tempcam2')
+    res = dop.ss_bs('select * from tempcam2 limit 200')
+    print(res)
 
 
 
