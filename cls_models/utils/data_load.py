@@ -21,16 +21,19 @@ def thread_load_data(read_q,roi_dir_path,batch_size,img_size,logger):
                     image_list = []
                     batch_img_path = files_path[i * batch_size:(i + 1) * batch_size]
                     for filename in batch_img_path:
-                        try:
-                            img = Image.open(filename)
-                        except Exception as E:
-                            logger.info(E)
-                            continue
-                        image_list.append(np.array(img))
-                        img = img.convert('RGB')
-                        img = img.resize((img_size,img_size))
-                        img = np.array(img)
-                        img = img / 255
+                        while True:
+                            try:
+                                img = Image.open(filename)
+                                img_ = np.array(img)
+                                img = img.convert('RGB')
+                                img = img.resize((img_size,img_size))
+                                img = np.array(img)
+                                img = img / 255
+                                break
+                            except Exception as E:
+                                time.sleep(0.01)
+                                continue
+                        image_list.append(img_)
                         image_arr_list.append(img)
                         image_path_list.append(filename)
                     delete_batch_file(batch_img_path)
@@ -38,14 +41,7 @@ def thread_load_data(read_q,roi_dir_path,batch_size,img_size,logger):
                         image_arr = np.array(image_arr_list)
                         if len(image_arr.shape) == 4:
                             read_q.put((image_arr, image_list, image_path_list))
-                            # while True:
-                            #     if read_q.full():
-                            #         time.sleep(0.1)
-                            #         re_print('队列已经满了，等待。。。。。。。。。。')
-                            #         continue
-                            #     else:
-                            #         read_q.put((image_arr,image_list,image_path_list))
-                            #         break
+
         except Exception as E:
             logger.info(E)
             raise

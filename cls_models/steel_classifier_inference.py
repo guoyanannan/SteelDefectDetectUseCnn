@@ -1,9 +1,8 @@
 import os
-import sys
 import time
 import yaml
 import argparse
-
+import signal
 from threading import Thread
 from queue import Queue
 from cls_models.utils.get_file_info import LOGS
@@ -39,7 +38,6 @@ def run(
     logs_oper = LOGS(log_path)
     ss = select_device(device)
     logs_oper.info(ss)
-
     if not debug:
         if os.path.exists(rois_dir):
             delete_dir(rois_dir)
@@ -95,7 +93,7 @@ def run(
         th.start()
 
         # 模型线程
-        thread_process_model_res(db_ip, db_user, db_psd,temp_db['db_name'],
+        thread_process_model_res(db_ip, db_user, db_psd,temp_db['db_name'],th,
                                  read_q,classifier_model,save_intercls,offline_result,
                                  defect_cam_num,negative,ignore,temp_tables,
                                  curr_schema,logs_oper,debug)
@@ -105,7 +103,7 @@ def run(
         raise Exception(f'{E}')
 
 
-def thread_process_model_res(db_ip, db_user, db_psd,db_name,
+def thread_process_model_res(db_ip, db_user, db_psd,db_name,thread_obj,
                              index_q,model,save_intercls,offline_result,
                              defect_cam_num,negative,ignore,temp_tables,
                              curr_schema,logger,debug):
@@ -116,10 +114,17 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,
     write_tabel = 0
     num_total = 0
     num_cur = 0
+    # 记录队列为空次数
+    q_num_empty = 0
     while True:
+        if not thread_obj.isAlive():
+            logger.info(f'数据获取线程：{thread_obj.getName()} 出现异常，强制退出')
+            os.kill(os.getpid(), signal.SIGINT)
         if not debug:
             db_oper_ = get_dbop(db_ip, db_user, db_psd, db_name, logger)
         if not index_q.empty():
+            # 重置次数
+            q_num_empty = 0
             num_cur += 1
             v1 = time.time()
             image_arr, image_list, batch_img_path = index_q.get()
@@ -161,6 +166,11 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,
                 db_oper_.close_()
             re_print(f'缺陷队列中暂时没有数据了,等待')
             time.sleep(1)
+            if q_num_empty < 300:
+                q_num_empty += 1
+            else:
+                logger.info(f'缺陷队列连续 {q_num_empty} 秒为空，数据获取线程：{thread_obj.getName()} 可能出现异常，强制退出')
+                os.kill(os.getpid(), signal.SIGINT)
 
 
 def parse_opt():
