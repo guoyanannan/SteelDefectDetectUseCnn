@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import yaml
 import argparse
@@ -84,7 +85,7 @@ def run(
                                                    op_log=logs_oper)
 
         img_size = classifier_model.imgsize
-        read_q = Queue(2)
+        read_q = Queue(3)
         # 数据线程
         th = Thread(target=lambda:thread_load_data(read_q,rois_dir,bs,img_size,logs_oper),)
         th.start()
@@ -131,6 +132,7 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,
                                                          curr_schema,
                                                          debug
                                                          )
+
             v4 = time.time()
             if debug:
                 num = 0
@@ -147,13 +149,13 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,
                 write_tabel += v6 - v5
                 total_time += v6 - v1
                 re_print(
-                    f'当前队列数量{index_q.qsize()} ,平均共耗时：{total_time / num_cur}s,读取{get_q_data / num_cur}s,推理{get_model_res / num_cur}s,FPS {num_total / get_model_res}，'
+                    f'当前队列数量{index_q.qsize()} ,此批次平均共耗时：{total_time / num_cur}s,读取{get_q_data / num_cur}s,推理{get_model_res / num_cur}s,FPS {num_total / get_model_res}，'
                     f'存入共享加整理{get_pro_res / num_cur}s, 数据库写入{write_tabel / num_cur}s')
-                print('--' * 20)
+                print('--' * 40)
         else:
             if bool(db_oper_):
                 db_oper_.close_()
-            re_print(f'缺陷目录暂时没有数据了,等待')
+            re_print(f'缺陷队列中暂时没有数据了,等待')
             time.sleep(1)
 
 
