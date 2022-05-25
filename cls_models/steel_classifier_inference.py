@@ -39,8 +39,12 @@ def run(
     logs_oper = LOGS(log_path)
     ss = select_device(device)
     logs_oper.info(ss)
+
     if not debug:
-        delete_dir(rois_dir)
+        if os.path.exists(rois_dir):
+            delete_dir(rois_dir)
+        else:
+            os.makedirs(rois_dir)
     try:
         curr_schema = eval(schema)
         try:

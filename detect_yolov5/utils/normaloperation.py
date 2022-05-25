@@ -17,7 +17,7 @@ except ImportError:
 
 
 def delete_temp(path):
-    time.sleep(60)
+    time.sleep(600)
     temp_path = path
     while 1:
         for file in os.listdir(temp_path):
@@ -28,7 +28,7 @@ def delete_temp(path):
                     shutil.rmtree(file_path)
                 except Exception as E:
                     # print(E)
-                    time.sleep(60)
+                    time.sleep(300)
                     pass
 
             if file.split('.')[-1] in ('log', 'py', 'dll'):
@@ -36,7 +36,7 @@ def delete_temp(path):
                     os.remove(file_path)
                 except Exception as E:
                     # print(E)
-                    time.sleep(60)
+                    time.sleep(300)
                     pass
 
 def re_print(info):
