@@ -1,9 +1,12 @@
 import os
 import time
 import yaml
-import math
 import argparse
+
+from threading import Thread
+from queue import Queue
 from cls_models.utils.get_file_info import LOGS
+from cls_models.utils.data_load import thread_load_data
 from cls_models.utils.db_mysql import get_camdefect_no,check_temp_db,get_dbop,write_defect_to_table
 from cls_models.steel_classifier_init import ClassificationAlgorithm
 from cls_models.utils.common_oper import select_device, select_no_img,parse_data,re_print,delete_dir
@@ -31,6 +34,7 @@ def run(
         transfers="{'db_name': 'temp', 'camera1': 'tempcam1', 'camera2': 'tempcam2'}",
         using="{'db_name': 'ncdcoldstripdefect', 'camera1': 'camdefect1', 'camera2': 'camdefect2'}",
         ):
+
     logs_oper = LOGS(log_path)
     ss = select_device(device)
     logs_oper.info(ss)
@@ -79,48 +83,78 @@ def run(
                                                    dynamic_size=dynamic_size,
                                                    op_log=logs_oper)
 
-        while True:
-            if not debug:
-                db_oper_ = get_dbop(db_ip,db_user,db_psd,temp_db['db_name'],logs_oper)
-            v1 = time.time()
-            file_name_list = sorted(os.listdir(rois_dir), key=lambda x: os.path.getmtime(os.path.join(rois_dir, x)))
-            files_path = [os.path.join(rois_dir, fileName) for fileName in file_name_list]
-            files_path = select_no_img(files_path, os.path.basename(rois_dir))
-            v2 = time.time()
-            re_print(f'路径整理时间: {v2-v1} s')
-            if files_path:
-                num_bs = math.ceil(len(files_path)/bs)
-                for i in range(num_bs):
-                    v21 = time.time()
-                    batch_img_path = files_path[i * bs:(i + 1) * bs]
-                    batch_result_iter = classifier_model.inference(batch_img_path)
-                    v22 = time.time()
-                    defect_cam_num, db_defects_info = parse_data(batch_result_iter,
-                                                                 save_intercls,
-                                                                 offline_result,
-                                                                 defect_cam_num,
-                                                                 negative,
-                                                                 ignore,
-                                                                 curr_schema
-                                                                 )
-                    if debug:
-                        num = 0
-                        for info in db_defects_info:
-                            num += len(info)
-                        re_print(f'采用非数据库形式存储当前批次共{num}条信息: {db_defects_info}')
-                    else:
-                        v3 = time.time()
-                        write_defect_to_table(db_oper_,db_defects_info,temp_tables)
-                        v4 = time.time()
-                        #re_print(f'读取加模型预测加结果整理共耗时：{v4 - v21}s,读取推理{v22 - v21}s，存入共享加整理{v3-v22}s,数据库写入{v4-v3}s')
-            else:
-                if bool(db_oper_):
-                    db_oper_.close_()
-                re_print(f'目录[{os.path.basename(rois_dir)}]暂时没有数据了,等待')
-                time.sleep(1)
+        img_size = classifier_model.imgsize
+        read_q = Queue(2)
+        # 数据线程
+        th = Thread(target=lambda:thread_load_data(read_q,rois_dir,bs,img_size,logs_oper),)
+        th.start()
+
+        # 模型线程
+        thread_process_model_res(db_ip, db_user, db_psd,temp_db['db_name'],
+                                 read_q,classifier_model,save_intercls,offline_result,
+                                 defect_cam_num,negative,ignore,temp_tables,
+                                 curr_schema,logs_oper,debug)
+
     except Exception as E:
         logs_oper.info(E)
         raise Exception(f'{E}')
+
+
+def thread_process_model_res(db_ip, db_user, db_psd,db_name,
+                             index_q,model,save_intercls,offline_result,
+                             defect_cam_num,negative,ignore,temp_tables,
+                             curr_schema,logger,debug):
+    total_time = 0
+    get_q_data = 0
+    get_model_res = 0
+    get_pro_res = 0
+    write_tabel = 0
+    num_total = 0
+    num_cur = 0
+    while True:
+        if not debug:
+            db_oper_ = get_dbop(db_ip, db_user, db_psd, db_name, logger)
+        if not index_q.empty():
+            num_cur += 1
+            v1 = time.time()
+            image_arr, image_list, batch_img_path = index_q.get()
+            num_total += len(batch_img_path)
+            v2 = time.time()
+            batch_result_iter = model.inference_asyn(batch_img_path, image_arr, image_list)
+            v3 = time.time()
+            defect_cam_num, db_defects_info = parse_data(batch_result_iter,
+                                                         save_intercls,
+                                                         offline_result,
+                                                         defect_cam_num,
+                                                         negative,
+                                                         ignore,
+                                                         curr_schema,
+                                                         debug
+                                                         )
+            v4 = time.time()
+            if debug:
+                num = 0
+                for info in db_defects_info:
+                    num += len(info)
+                re_print(f'采用非数据库形式存储当前批次共{num}条信息: {db_defects_info}')
+            else:
+                v5 = time.time()
+                write_defect_to_table(db_oper_, db_defects_info, temp_tables)
+                v6 = time.time()
+                get_q_data += v2 - v1
+                get_model_res += v3 - v2
+                get_pro_res += v4 - v3
+                write_tabel += v6 - v5
+                total_time += v6 - v1
+                re_print(
+                    f'当前队列数量{index_q.qsize()} ,平均共耗时：{total_time / num_cur}s,读取{get_q_data / num_cur}s,推理{get_model_res / num_cur}s,FPS {num_total / get_model_res}，'
+                    f'存入共享加整理{get_pro_res / num_cur}s, 数据库写入{write_tabel / num_cur}s')
+                print('--' * 20)
+        else:
+            if bool(db_oper_):
+                db_oper_.close_()
+            re_print(f'缺陷目录暂时没有数据了,等待')
+            time.sleep(1)
 
 
 def parse_opt():

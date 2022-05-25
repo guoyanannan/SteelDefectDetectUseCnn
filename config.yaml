@@ -3,7 +3,7 @@ detect:
   filePath:
     weights: './weights/steel_detector/bests.pt'
     logs: './arith_logs/detect_logs'
-    rois: './result_roi_8k'
+    rois: 'D:/result_roi_8k'
     srcs:
       - C:/detectsrc1
       - F:/detectsrc2
@@ -42,7 +42,7 @@ classifier:
     ini: './weights/steel_classifier/steel_classifier_interaction.ini'
     xml: './weights/steel_classifier/steel_class_table.xml'
     logs: './arith_logs/classifier_logs'
-    input: './result_roi_8k'
+    input: 'D:/result_roi_8k'
     # 主要用于分类结果的存储，便于样本的收集
     internal_number: ()
     offline_result: './classification_result'
@@ -67,7 +67,7 @@ classifier:
       camera1: 'camdefect1'
       camera2: 'camdefect2'
   infoParameter:
-    bs: 16
+    bs: 64
     # 数据库中为背景的类别ID(字段class:0)
     negative: 0
     # 忽略分数
@@ -75,7 +75,7 @@ classifier:
     #相机数
     cam_num: 2
     # 0.1.2.3 or cpu
-    device: 'cpu'
+    device: '0'
     dynamicsize: False
     debug: False
 # 数据库中信息后处理

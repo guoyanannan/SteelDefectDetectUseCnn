@@ -29,7 +29,11 @@ class ClassificationAlgorithm(ReadConvertFile):
         image_arr = []
         image_list = []
         for filename in batch_img_path:
-            img = Image.open(filename)
+            try:
+                img = Image.open(filename)
+            except:
+                delete_batch_file([filename])
+                continue
             image_list.append(np.array(img))
             img = img.convert('RGB')
             img = img.resize((self.imgsize, self.imgsize))
@@ -100,6 +104,8 @@ class ClassificationAlgorithm(ReadConvertFile):
             self.model = Model(inputs=base_model.input, outputs=predictions)
         try:
             load_status = self.model.load_weights(self.model_path)
+            test_arr = np.zeros((1,self.imgsize,self.imgsize,3))
+            _ = self.model.predict(test_arr,batch_size=1)
             self.op_log.info(f'{self.ModelName}模型加载成功')
         except Exception as EEer:
             self.op_log.info('模型加载失败，错误信息：{}'.format(EEer))
@@ -119,32 +125,18 @@ class ClassificationAlgorithm(ReadConvertFile):
         v4 = time.time()
         re_print(f'读取加模型预测加结果整理共耗时：{v4-v1}s,读取{v2-v1}s,推理{v3-v2}s,整理{v4-v3}s')
         return total_result_iter
-    # def ClsInference(self):
-    #     img_path = self.img_path
-    #     bs = self.bs
-    #     model = self.create_model()
-    #     while True:
-    #         filePath = [os.path.join(img_path, fileName) for fileName in os.listdir(img_path)]
-    #         filePath = self.select_no_img(filePath)
-    #         if filePath:
-    #             num_bs = math.ceil(len(filePath)/bs)
-    #             for i in range(num_bs):
-    #                 batch_img_path = filePath[i*bs:(i+1)*bs]
-    #                 bs_img = self.img_proces(batch_img_path)
-    #                 if bs_img is not None:
-    #                     result = model.predict(bs_img,batch_size=bs_img.shape[0])
-    #                     result_max = result.max(axis=1).astype('float16')
-    #                     result_name = [self.inter_and_name[self.index_and_inter[i]] for i in result.argmax(axis=1)]
-    #                     batch_img_save_path = [result_name[i] +"_"+str(int(result_max[i]*100))+"_"+str(j.split('\\')[1]) for i,j in enumerate(batch_img_path)]
-    #                     for j in range(len(batch_img_path)):
-    #                         if self.is_move:
-    #                             shutil.move(batch_img_path[j],os.path.join(self.img_save_path,batch_img_save_path[j]))
-    #                         else:
-    #                             shutil.copy(batch_img_path[j], os.path.join(self.img_save_path, batch_img_save_path[j]))
-    #                     print(f'当前已完成{i+1}批次数据的解析存储！！！！！')
-    #
-    #         else:
-    #             time.sleep(1)
-    #             print('没有需要分类的数据了！！！！！！！！')
+
+    def inference_asyn(self, batch_path,img_arr_bs,img_list_bs):
+
+        print(img_arr_bs.shape)
+        results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
+        scores = results.max(axis=1).astype('float16') * 100
+        inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
+        cls_name = [self.inter_and_name[i] for i in inter_no]
+        enter_no = [self.inter_and_exter[i] for i in inter_no]
+        total_result_iter = zip(batch_path,img_list_bs,cls_name,inter_no,enter_no,scores)
+
+        return total_result_iter
+
 
 

@@ -4,8 +4,7 @@ import platform
 import logging
 import tensorflow as tf
 from PIL import Image
-from threading import Thread
-from queue import Queue
+
 
 
 def re_print(info):
@@ -30,7 +29,7 @@ def select_device(device,batch_size=0, newline=True):
         tf.config.experimental.set_memory_growth(physical_devices[int(device)], True)
         tf.config.experimental.set_virtual_device_configuration(
             physical_devices[int(device)],
-            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
+            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=3000)]
         )
         s += f'GPU:{device} '
     cuda = not cpu
@@ -110,7 +109,7 @@ def delete_dir(dir_path):
         delete_batch_file(files_path)
 
 
-def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_ignore,score_ignore,curr_schema):
+def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_ignore,score_ignore,curr_schema,debug):
     defect_infos = [[] for i in range(len(curr_defect_cam_num))]
     for infos in info_iter:
         img_path, img_roi, class_name, internal_no, external_no, score = infos
@@ -145,7 +144,7 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
             grade, cycle = 0, 0
             try:
                 # 存数据
-                if curr_schema['flag'] == 0:
+                if curr_schema['flag'] == 0 and not debug:
                     img_roi_pil = Image.fromarray(img_roi)
                     dir_path = curr_schema[f'camera{cam_no}']
                     save_dir_ = os.path.join(dir_path,steel_no)
