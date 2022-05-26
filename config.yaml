@@ -3,7 +3,7 @@ detect:
   filePath:
     weights: './weights/steel_detector/bests.pt'
     logs: './arith_logs/detect_logs'
-    rois: 'D:/result_roi_8k'
+    rois: 'E:/result_roi_8k'
     srcs:
       - C:/detectsrc1
       - F:/detectsrc2
@@ -42,7 +42,7 @@ classifier:
     ini: './weights/steel_classifier/steel_classifier_interaction.ini'
     xml: './weights/steel_classifier/steel_class_table.xml'
     logs: './arith_logs/classifier_logs'
-    input: 'D:/result_roi_8k'
+    input: 'E:/result_roi_8k'
     # 主要用于分类结果的存储，便于样本的收集
     internal_number: ()
     offline_result: './classification_result'
