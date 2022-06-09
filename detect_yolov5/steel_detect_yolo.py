@@ -226,13 +226,12 @@ class YOLOInit(nn.Module):
                 if abs(x2-x1)*abs(y2-y1) >= 1024 * 1024:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//4, img_roi.shape[0]//4))
                     x1_roi, y1_roi, x2_roi, y2_roi = x1_roi//4, y1_roi//4, x2_roi//4, y2_roi//4
-                elif abs(x2-x1) > 30:
+                elif abs(x2-x1) >= 512:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
                     x1_roi,x2_roi = x1_roi//3, x2_roi//3
-
                 if debug:
                     img_roi_draw = cv2.cvtColor(img_roi, cv2.COLOR_GRAY2RGB)
-                    cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3,lineType=cv2.LINE_AA)
+                    cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3, lineType=cv2.LINE_AA)
             #
             # # 画ROI中的框
             # im_roi_draw = im_roi.copy()
@@ -293,7 +292,7 @@ class YOLOInit(nn.Module):
                 outside = p1[1] - h - 3 >= 0  # label fits outside box
                 p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
                 cv2.rectangle(img_draw_, p1, p2, color, -1, cv2.LINE_AA)  # filled
-                cv2.putText(img_draw_, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color,thickness=tf, lineType=cv2.LINE_AA)
+                cv2.putText(img_draw_, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color, thickness=tf, lineType=cv2.LINE_AA)
                 # 边界
                 cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
                 cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)

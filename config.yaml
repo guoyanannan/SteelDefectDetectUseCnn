@@ -1,9 +1,9 @@
 # defect detect config
 detect:
   filePath:
-    weights: './weights/bests.pt'
-    logs: './detect_logs'
-    rois: './result_roi_8k'
+    weights: './weights/steel_detector/bests.pt'
+    logs: './arith_logs/detect_logs'
+    rois: 'E:/result_roi_8k'
     srcs:
       - C:/detectsrc1
       - F:/detectsrc2
@@ -36,3 +36,66 @@ detect:
     dnn: False
     debug: False
 # defect recognition config
+classifier:
+  filePath:
+    weights: './weights/steel_classifier/steel_model_classifier.h5'
+    ini: './weights/steel_classifier/steel_classifier_interaction.ini'
+    xml: './weights/steel_classifier/steel_class_table.xml'
+    logs: './arith_logs/classifier_logs'
+    input: 'E:/result_roi_8k'
+    # 主要用于分类结果的存储，便于样本的收集
+    internal_number: ()
+    offline_result: './classification_result'
+    # 新平台需要将数据保存的目录,有几个相机就对应有几个
+    schema:
+      # 有无算法测试程序
+      flag: 0
+      camera1: 'F:/defectImg1'
+      camera2: 'F:/defectImg2'
+  dbInfo:
+    db_ip: '127.0.0.1'
+    db_user: 'root'
+    db_psd: 'nercar'
+    # 中转站临时库和表
+    transfers:
+      db_name: 'temp'
+      camera1: 'tempcam1'
+      camera2: 'tempcam2'
+    # 正式表和库
+    using:
+      db_name: 'ncdcoldstripdefect'
+      camera1: 'camdefect1'
+      camera2: 'camdefect2'
+  infoParameter:
+    bs: 64
+    # 数据库中为背景的类别ID(字段class:0)
+    negative: 0
+    # 忽略分数
+    score_ignore: 50
+    #相机数
+    cam_num: 2
+    # 0.1.2.3 or cpu
+    device: '0'
+    dynamicsize: False
+    debug: False
+# 数据库中信息后处理
+dbinfoprocess:
+  filePath:
+    logs: './arith_logs/data_pprocess_logs'
+  dbInfo:
+    db_ip: '127.0.0.1'
+    db_user: 'root'
+    db_psd: 'nercar'
+    # 中转站临时库和表
+    transfers:
+      db_name: 'temp'
+      camera1: 'tempcam1'
+      camera2: 'tempcam2'
+    # 正式表和库
+    using:
+      db_name: 'ncdcoldstripdefect'
+      camera1: 'camdefect1'
+      camera2: 'camdefect2'
+  infoParameter:
+    #相机数
+    cam_num: 2
