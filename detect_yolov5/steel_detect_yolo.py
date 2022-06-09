@@ -229,7 +229,7 @@ class YOLOInit(nn.Module):
                 elif abs(x2-x1) > 30:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
                     x1_roi,x2_roi = x1_roi//3, x2_roi//3
-                
+
                 if debug:
                     img_roi_draw = cv2.cvtColor(img_roi, cv2.COLOR_GRAY2RGB)
                     cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3,lineType=cv2.LINE_AA)
