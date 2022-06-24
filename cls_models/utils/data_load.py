@@ -26,7 +26,7 @@ def thread_load_data(read_q,roi_dir_path,batch_size,img_size,logger):
                                 img = Image.open(filename)
                                 img_ = np.array(img)
                                 img = img.convert('RGB')
-                                img = img.resize((img_size,img_size))
+                                img = img.resize((img_size,img_size),Image.NEAREST) # train_genarator
                                 img = np.array(img)
                                 img = img / 255
                                 break
