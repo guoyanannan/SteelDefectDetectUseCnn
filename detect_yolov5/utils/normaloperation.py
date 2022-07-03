@@ -73,15 +73,19 @@ def thread_save_rois(infos,save_dir_path):
 
 
 def marge_box(pre_boxes,class_names,iou_thresh=0.0,debug=False):
+    # 仅用于测试荣融合框的信息
+    # debug = True
     #用于框的融合
     bboxes_arr = pre_boxes
     if debug:
-        print('去除空列表原始后的result数组:',len(bboxes_arr))
+        print('去除空列表原始后的result数组:',len(bboxes_arr),bboxes_arr)
     if len(bboxes_arr) != 0 :
         cls_boxes_after_merge = []
         for every_cls_index in range(len(class_names)):
             #  left, top, right, bottom, score,cls
             the_boxes = bboxes_arr[torch.where(bboxes_arr[:,-1] == every_cls_index)[0], :]
+            if not len(the_boxes):
+                continue
             while len(the_boxes) > 1:
                 if debug:
                     print(f'类别{every_cls_index}的框:\n{the_boxes}')

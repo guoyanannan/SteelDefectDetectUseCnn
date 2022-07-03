@@ -1,5 +1,7 @@
 import os
 import os.path
+import sys
+
 import cv2
 import glob
 import torch
@@ -7,6 +9,7 @@ import time
 import json
 import yaml
 import gevent
+import signal
 import math
 import random
 import numpy as np
@@ -505,6 +508,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
             # 有无算法测试程序，也可用来进行离线调试
             # 1:有算法测试程序 2:无算法测试程序
             if schema:
+
                 total_images_s = []
                 for dir_path in dirs_path:
                     files = sorted(glob.glob(os.path.join(dir_path, '*.*')))
@@ -529,6 +533,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
                     del list_th
                     end_time = time.time()
                     re_print(f'当前共读取 {len(total_images_s)} 张图像耗时{end_time-start_time}s,平均均耗时{(end_time-start_time)/len(total_images_s)}s')
+
                 else:
                     time.sleep(1)
                     re_print(f'{dirs_path}暂时没有数据了，等待新数据')
@@ -575,7 +580,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         except:
             pass
         logger_.info(f'{E}')
-        raise E
+        os.kill(os.getpid(), signal.SIGINT)
 
 
 def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
@@ -691,4 +696,7 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
 
     except Exception as E:
         logger_.info(E)
-        raise E
+        os.kill(os.getpid(), signal.SIGINT)
+
+
+

@@ -1,12 +1,12 @@
 # defect detect config
 detect:
   filePath:
-    weights: './weights/steel_detector/bests.pt'
+    weights: './weights/steel_detector/bestschar.pt'
     logs: './arith_logs/detect_logs'
-    rois: 'E:/result_roi_8k'
+    rois: './result_roi_4k'
     srcs:
-      - C:/detectsrc1
-      - F:/detectsrc2
+      - './data/chers'
+      -
       -
   
   dbInfo:
@@ -17,12 +17,12 @@ detect:
 
   infoParameter:
     img_size: 416
-    conf_thres: 0.25
+    conf_thres: 0.15
     iou_thres: 0.45
     bin_thres: 0.35
     edge_shift: 0
     max_det: 1000
-    pro_num: 3
+    pro_num: 1
     # 检测图像存储最大卷数
     max_save_steelno: 2
     # 0表示存储所有图像
@@ -30,8 +30,8 @@ detect:
     loop: 600
     # 'cuda device, i.e. 0 or 0,1,2,3 or cpu'
     device: '0'
-    cam_res: '8k'
-    schema: 0
+    cam_res: '4k'
+    schema: 1
     half: False
     dnn: False
     debug: False
