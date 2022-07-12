@@ -26,6 +26,7 @@
 !cfg/yolov3*.cfg
 
 storage.googleapis.com
+classification_result/*
 result_img/*
 result_img_1/*
 small_img_1/*

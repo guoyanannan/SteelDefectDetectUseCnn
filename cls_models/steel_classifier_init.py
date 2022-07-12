@@ -15,7 +15,7 @@ from tensorflow.keras.models import Model
 
 
 class ClassificationAlgorithm(ReadConvertFile):
-    def __init__(self,**kwargs):
+    def __init__(self, **kwargs):
         super(ClassificationAlgorithm, self).__init__(**kwargs)
         self.bs = kwargs['batch_size']
         self.model_path = kwargs['model_path']
@@ -126,16 +126,27 @@ class ClassificationAlgorithm(ReadConvertFile):
         re_print(f'读取加模型预测加结果整理共耗时：{v4-v1}s,读取{v2-v1}s,推理{v3-v2}s,整理{v4-v3}s')
         return total_result_iter
 
-    def inference_asyn(self, batch_path,img_arr_bs,img_list_bs):
+    def inference_asyn(self, batch_path,img_arr_bs,img_list_bs,use_classifier):
 
         print(img_arr_bs.shape)
-        results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
-        scores = results.max(axis=1).astype('float16') * 100
-        inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
-        cls_name = [self.inter_and_name[i] for i in inter_no]
-        enter_no = [self.inter_and_exter[i] for i in inter_no]
-        total_result_iter = zip(batch_path,img_list_bs,cls_name,inter_no,enter_no,scores)
-
+        if use_classifier:
+            results = self.model.predict(img_arr_bs, batch_size=img_arr_bs.shape[0])
+            scores = results.max(axis=1).astype('float16') * 100
+            inter_no = [self.index_and_inter[i] for i in results.argmax(axis=1)]
+            cls_name = [self.inter_and_name[i] for i in inter_no]
+            enter_no = [self.inter_and_exter[i] for i in inter_no]
+            total_result_iter = zip(batch_path,img_list_bs,cls_name,inter_no,enter_no,scores)
+        else:
+            cls_name_list,inter_no_list,enter_no_list,score_list = [],[],[],[]
+            for path in batch_path:
+                _,cls_name,score,_ = path.rsplit('_',3)
+                inter_no = self.name_and_inter[cls_name]
+                exter_no = self.inter_and_exter[inter_no]
+                cls_name_list.append(cls_name)
+                score_list.append(float(score))
+                inter_no_list.append(inter_no)
+                enter_no_list.append(exter_no)
+            total_result_iter = zip(batch_path, img_list_bs,cls_name_list,inter_no_list,enter_no_list,score_list)
         return total_result_iter
 
 
