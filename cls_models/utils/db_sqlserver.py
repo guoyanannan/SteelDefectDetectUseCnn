@@ -22,7 +22,7 @@ class DatabaseSer:
             self.cursor = self.conn.cursor()
         except Exception as E:
             self.loger.info(E)
-            raise Exception(E)
+            raise
 
     def search(self, sql):
         try:
@@ -84,13 +84,13 @@ class DatabaseSer:
 
 class SqlSerOp(object):
 
-    def __init__(self, cam_num, db_ip="192.168.0.100", db_user="ARNTUSER", db_pwd="ARNTUSER"):
+    def __init__(self, cam_num, log_op,db_ip="192.168.0.100", db_user="ARNTUSER", db_pwd="ARNTUSER"):
         self.__dict__.update(locals())
 
     def create_cam_procedure(self):
         for cam_no in range(1, self.cam_num + 1):
             database_name = "ClientDefectDB{}".format(cam_no)
-            db_oper = DatabaseSer(database_name, self.db_ip, self.db_user, self.db_pwd)
+            db_oper = DatabaseSer(database_name,self.log_op,self.db_ip, self.db_user, self.db_pwd)
             db_oper.connect()
 
             sql_info = '''
@@ -128,7 +128,7 @@ class SqlSerOp(object):
         cam_info_num = {}
         for cam_no in range(1, self.cam_num + 1):
             database_name = "ClientDefectDB{}".format(cam_no)
-            db_oper = DatabaseSer(database_name, self.db_ip,  self.db_user,  self.db_pwd)
+            db_oper = DatabaseSer(database_name, self.log_op,self.db_ip,  self.db_user,  self.db_pwd)
             db_oper.connect()
             defects_list = defects_infos[cam_no-1]
             cam_info_num[database_name] = len(defects_list)
@@ -157,7 +157,7 @@ class SqlSerOp(object):
 
     def get_curr_steel_no(self):
         database_name = "SteelRecord"
-        db_oper = DatabaseSer(database_name, self.db_ip,  self.db_user,  self.db_pwd)
+        db_oper = DatabaseSer(database_name, self.log_op, self.db_ip,  self.db_user,  self.db_pwd)
         db_oper.connect()
         sql = "select top 1 * from steel order by SequeceNo desc"
         res = db_oper.search(sql)
@@ -170,7 +170,7 @@ class SqlSerOp(object):
 
     def get_curr_finish_steel_no(self):
         database_name = "SteelRecord"
-        db_oper = DatabaseSer(database_name, self.db_ip,  self.db_user,  self.db_pwd)
+        db_oper = DatabaseSer(database_name, self.log_op, self.db_ip,  self.db_user,  self.db_pwd)
         db_oper.connect()
         sql = "select top 5 * from steel order by SequeceNo desc"
         res = db_oper.search(sql)
@@ -185,7 +185,7 @@ class SqlSerOp(object):
 
     def get_curr_steel_type(self):
         database_name = "SteelRecord"
-        db_oper = DatabaseSer(database_name, self.db_ip,  self.db_user,  self.db_pwd)
+        db_oper = DatabaseSer(database_name, self.log_op, self.db_ip,  self.db_user,  self.db_pwd)
         db_oper.connect()
         sql = "select top 1 * from SteelID1 order by No desc"
         res = db_oper.search(sql)
@@ -197,7 +197,7 @@ class SqlSerOp(object):
 
 
 if __name__ == '__main__':
-    sql_ob = SqlSerOp(cam_num=4)
+    sql_ob = SqlSerOp(cam_num=4,log_op=None)
     print(sql_ob.db_ip)
     print(sql_ob.db_user)
     print(sql_ob.db_pwd)

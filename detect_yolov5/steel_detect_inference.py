@@ -57,7 +57,6 @@ def run(
 
     pid_list = []
     source = dirs
-
     try:
         model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize, dnn=dnn)
     except Exception as E:

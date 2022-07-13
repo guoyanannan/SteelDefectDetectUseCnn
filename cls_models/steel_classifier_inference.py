@@ -131,12 +131,8 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,thread_obj,
     q_num_empty = 0
     schema_flag = int(curr_schema['flag'])
     if not debug and schema_flag:
-        try:
-            db_oper_ = SqlSerOp(cam_num=len(defect_cam_num),db_ip=db_ip)
-            db_oper_.create_cam_procedure()
-        except Exception as E:
-            logger.info(E)
-            os.kill(os.getpid(), signal.SIGINT)
+        db_oper_ = SqlSerOp(cam_num=len(defect_cam_num),log_op=logger,db_ip=db_ip)
+        db_oper_.create_cam_procedure()
 
     while True:
         if not thread_obj.isAlive():
@@ -144,7 +140,6 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,thread_obj,
             os.kill(os.getpid(), signal.SIGINT)
         if not debug and not schema_flag:
             db_oper_ = get_dbop(db_ip, db_user, db_psd, db_name, logger)
-
         if not index_q.empty():
             # 重置次数
             q_num_empty = 0

@@ -501,6 +501,10 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         if not schema:
             db_op = DbMysqlOp(ip=db_config['db_ip'], user=db_config['db_user'], psd=db_config['db_psd'],
                               db_name=db_config['db_name'])
+        else:
+            for dir_path in dirs_path:
+                for file_path in glob.glob(os.path.join(dir_path, '*.*')):
+                    remove_file(file_path,logger_)
         # 用于统计
         index_q_num = 0
         total_time = 0
@@ -508,7 +512,6 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
             # 有无算法测试程序，也可用来进行离线调试
             # 1:有算法测试程序 2:无算法测试程序
             if schema:
-
                 total_images_s = []
                 for dir_path in dirs_path:
                     files = sorted(glob.glob(os.path.join(dir_path, '*.*')))
@@ -616,7 +619,7 @@ def get_data_from_q(infos:list,data_q):
                 num += 1
                 end_time = time.time()
                 total_time += end_time-start_time
-            re_print(f'###本次读取队列 {num} 个数据共耗时 {total_time}s,平均耗时{total_time/num}s###')
+            re_print(f'{os.getpid()} ###本次读取队列 {num} 个数据共耗时 {total_time}s,平均耗时{total_time/num}s###')
 
 
 

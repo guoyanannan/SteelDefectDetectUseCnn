@@ -38,14 +38,14 @@ def thread_load_data(read_q,roi_dir_path,batch_size,img_size,logger):
                         image_list.append(img_)
                         image_arr_list.append(img)
                         image_path_list.append(filename)
-                    # delete_batch_file(batch_img_path)
+                    delete_batch_file(batch_img_path)
                     if len(image_arr_list) != 0:
                         image_arr = np.array(image_arr_list)
                         if len(image_arr.shape) == 4:
                             read_q.put((image_arr, image_list, image_path_list))
 
         except Exception as E:
-            logger.info(E)
+            logger.info(f'数据加载出现异常:{E}')
             raise
 
 

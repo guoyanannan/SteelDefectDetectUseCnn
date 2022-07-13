@@ -161,7 +161,7 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
                                     os.makedirs(save_dir_)
                                     break
                                 except Exception as E:
-                                    re_print(E)
+                                    re_print(f'创建目录{save_dir_}出现异常:{E}')
                                     time.sleep(0.1)
                         img_path = os.path.join(save_dir_, f'{defect_id}.bmp')
                         img_roi_pil.save(img_path)
@@ -191,7 +191,7 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
                                      )
                     defect_infos[int(cam_no)-1].append(curr_roi_info)
                 except Exception as E:
-                    re_print(E)
+                    re_print(f'数据整理及存储出现异常:{E}')
                     os.kill(os.getpid(), signal.SIGINT)
                 else:
                     curr_defect_cam_num[cam_no] = defect_id
@@ -220,7 +220,7 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
                                      )
                     defect_infos[int(cam_no) - 1].append(curr_roi_info)
                 except Exception as E:
-                    re_print(E)
+                    re_print(f'数据整理出现异常:{E}')
                     os.kill(os.getpid(), signal.SIGINT)
                 else:
                     curr_defect_cam_num[cam_no] = defect_id
