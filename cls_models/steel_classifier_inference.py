@@ -179,12 +179,13 @@ def thread_process_model_res(db_ip, db_user, db_psd,db_name,thread_obj,
                 write_tabel += v6 - v5
                 total_time += v6 - v1
                 re_print(
-                    f'当前队列剩余数量{index_q.qsize()} ,批次平均共耗时：{total_time / num_cur}s,读取{get_q_data / num_cur}s,推理{get_model_res / num_cur}s,FPS {num_total / get_model_res}，'
+                    f'当前队列剩余数量{index_q.qsize()} ,批次平均共耗时：{total_time / num_cur}s,读取{get_q_data / num_cur}s,推理{get_model_res / num_cur}s,FPS {num_total / (get_model_res+1e-10)}，'
                     f'存入共享加整理{get_pro_res / num_cur}s, 数据库写入{write_tabel / num_cur}s')
                 print('--' * 40)
         else:
             if bool(db_oper_):
-                db_oper_.close_()
+                if not schema_flag:
+                    db_oper_.close_()
             re_print(f'缺陷队列中暂时没有数据了,等待')
             time.sleep(1)
             if q_num_empty < 7200:

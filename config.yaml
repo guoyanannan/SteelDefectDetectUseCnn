@@ -5,7 +5,7 @@ detect:
     logs: './arith_logs/detect_logs'
     rois: './result_roi_4k'
     srcs:
-      - './data/hengqie'
+      - 'D:/ArNTPreSteelImage'
       -
       -
   
@@ -44,8 +44,8 @@ classifier:
     logs: './arith_logs/classifier_logs'
     input: './result_roi_4k'
     # 主要用于分类结果的存储，便于样本的收集
-    internal_number: (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45)
-    #internal_number: ()
+    #internal_number: (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45)
+    internal_number: ()
     offline_result: './classification_result'
     # 新平台需要将数据保存的目录,有几个相机就对应有几个
     schema:

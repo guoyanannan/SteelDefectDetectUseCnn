@@ -111,7 +111,7 @@ def run(
     del_thread.start()
     # 捕捉关闭按钮
     win32api.SetConsoleCtrlHandler(lambda x: my_exit(pid_list,model.log_op), True)
-    num =0
+    num = 0
     time_t = 0
     time_tt = 0
     while 1:
