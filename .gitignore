@@ -101,6 +101,8 @@ wheels/
 kpl.py
 
 # PyInstaller
+# the development version (4.0.dev0) has tensorflow support. 
+# Please use that.pip install https://github.com/pyinstaller/pyinstaller/archive/develop.zip
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
