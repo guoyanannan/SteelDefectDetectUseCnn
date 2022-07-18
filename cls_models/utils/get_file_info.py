@@ -189,6 +189,7 @@ class ReadConvertFile(object):
             classnum = p[0].text
             self.inter_and_exter = {}
             self.inter_and_name = {}
+            self.name_and_inter = {}
             for i in range(int(classnum)):
                 s = './缺陷类别/类别%d' % i
                 # print(s)
@@ -208,6 +209,7 @@ class ReadConvertFile(object):
                             exteral_no = child.text
                     self.inter_and_exter[interal_no] = exteral_no
                     self.inter_and_name[interal_no] = interal_name
+                    self.name_and_inter[interal_name] = interal_no
 
     def read_ini(self):
         if True == os.path.exists(self.ini_path):

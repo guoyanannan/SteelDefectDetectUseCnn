@@ -3,10 +3,10 @@ detect:
   filePath:
     weights: './weights/steel_detector/bests.pt'
     logs: './arith_logs/detect_logs'
-    rois: 'E:/result_roi_8k'
+    rois: './result_roi_4k'
     srcs:
-      - C:/detectsrc1
-      - F:/detectsrc2
+      - 'D:/ArNTPreSteelImage'
+      -
       -
   
   dbInfo:
@@ -16,8 +16,8 @@ detect:
     db_name: 'ncdcoldstrip'
 
   infoParameter:
-    img_size: 416
-    conf_thres: 0.25
+    img_size: 614
+    conf_thres: 0.15
     iou_thres: 0.45
     bin_thres: 0.35
     edge_shift: 0
@@ -30,8 +30,8 @@ detect:
     loop: 600
     # 'cuda device, i.e. 0 or 0,1,2,3 or cpu'
     device: '0'
-    cam_res: '8k'
-    schema: 0
+    cam_res: '4k'
+    schema: 1
     half: False
     dnn: False
     debug: False
@@ -42,14 +42,15 @@ classifier:
     ini: './weights/steel_classifier/steel_classifier_interaction.ini'
     xml: './weights/steel_classifier/steel_class_table.xml'
     logs: './arith_logs/classifier_logs'
-    input: 'E:/result_roi_8k'
+    input: './result_roi_4k'
     # 主要用于分类结果的存储，便于样本的收集
+    #internal_number: (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45)
     internal_number: ()
     offline_result: './classification_result'
     # 新平台需要将数据保存的目录,有几个相机就对应有几个
     schema:
       # 有无算法测试程序
-      flag: 0
+      flag: 1
       camera1: 'F:/defectImg1'
       camera2: 'F:/defectImg2'
   dbInfo:
@@ -71,13 +72,14 @@ classifier:
     # 数据库中为背景的类别ID(字段class:0)
     negative: 0
     # 忽略分数
-    score_ignore: 50
+    score_ignore: 0
     #相机数
-    cam_num: 2
+    cam_num: 4
     # 0.1.2.3 or cpu
     device: '0'
     dynamicsize: False
     debug: False
+    use_classifier: False
 # 数据库中信息后处理
 dbinfoprocess:
   filePath:

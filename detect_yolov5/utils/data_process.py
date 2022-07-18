@@ -1,5 +1,7 @@
 import os
 import os.path
+import sys
+
 import cv2
 import glob
 import torch
@@ -7,6 +9,7 @@ import time
 import json
 import yaml
 import gevent
+import signal
 import math
 import random
 import numpy as np
@@ -498,6 +501,10 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         if not schema:
             db_op = DbMysqlOp(ip=db_config['db_ip'], user=db_config['db_user'], psd=db_config['db_psd'],
                               db_name=db_config['db_name'])
+        else:
+            for dir_path in dirs_path:
+                for file_path in glob.glob(os.path.join(dir_path, '*.*')):
+                    remove_file(file_path,logger_)
         # 用于统计
         index_q_num = 0
         total_time = 0
@@ -529,6 +536,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
                     del list_th
                     end_time = time.time()
                     re_print(f'当前共读取 {len(total_images_s)} 张图像耗时{end_time-start_time}s,平均均耗时{(end_time-start_time)/len(total_images_s)}s')
+
                 else:
                     time.sleep(1)
                     re_print(f'{dirs_path}暂时没有数据了，等待新数据')
@@ -575,7 +583,7 @@ def read_images(dirs_path, q, schema, loop_num,edge_shift, bin_thres, cam_res, l
         except:
             pass
         logger_.info(f'{E}')
-        raise E
+        os.kill(os.getpid(), signal.SIGINT)
 
 
 def get_steel_edge(q, q_list,schema, edge_shift, bin_thres, cam_res, log_path):
@@ -611,7 +619,7 @@ def get_data_from_q(infos:list,data_q):
                 num += 1
                 end_time = time.time()
                 total_time += end_time-start_time
-            re_print(f'###本次读取队列 {num} 个数据共耗时 {total_time}s,平均耗时{total_time/num}s###')
+            re_print(f'{os.getpid()} ###本次读取队列 {num} 个数据共耗时 {total_time}s,平均耗时{total_time/num}s###')
 
 
 
@@ -691,4 +699,7 @@ def data_tensor_infer(q,result_roi_q,model_obj,cam_resolution,img_resize,stride,
 
     except Exception as E:
         logger_.info(E)
-        raise E
+        os.kill(os.getpid(), signal.SIGINT)
+
+
+

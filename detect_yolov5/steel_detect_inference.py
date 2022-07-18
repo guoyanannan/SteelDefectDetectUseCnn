@@ -14,7 +14,7 @@ import yaml
 from threading import Thread
 from multiprocessing import Process, Queue,freeze_support
 from detect_yolov5.utils.data_process import data_tensor_infer,read_images,pro_th_readimg
-from detect_yolov5.utils.general import check_img_size, print_args
+from detect_yolov5.utils.general import check_img_size,print_args
 from detect_yolov5.steel_detect_yolo import YOLOInit
 from detect_yolov5.utils.normaloperation import re_print,delete_temp
 
@@ -27,6 +27,7 @@ def my_exit(pids,ex_logger):
     for pip in pids:
         pip.terminate()
     os.kill(os.getpid(), signal.SIGINT)
+
 
 @torch.no_grad()
 def run(
@@ -56,7 +57,6 @@ def run(
 
     pid_list = []
     source = dirs
-
     try:
         model = YOLOInit(weights, gpu_cpu=device, half=half, log_path=log_path, augment_=augment, visualize_=visualize, dnn=dnn)
     except Exception as E:
@@ -65,7 +65,7 @@ def run(
     model.log_op.info(f'host process-{os.getpid()} starting success')
     stride, names, pt, device = model.stride, model.names, model.pt,model.device
     imgsz = check_img_size(imgsz, s=stride)  # check image size
-    some_info = f'图像路径:{source} 显卡索引:{device} 图像缩放尺寸:{imgsz} 循环数量:{num_loop}'
+    some_info = f'有无算法测试程序:{"有" if schema else "无"} 图像路径:{source} 显卡索引:{device} 图像缩放尺寸:{imgsz} 循环数量:{num_loop} 类别名称:{names}'
     model.log_op.info(some_info)
 
     # read image q
@@ -111,12 +111,13 @@ def run(
     del_thread.start()
     # 捕捉关闭按钮
     win32api.SetConsoleCtrlHandler(lambda x: my_exit(pid_list,model.log_op), True)
-    num =0
+    num = 0
     time_t = 0
     time_tt = 0
     while 1:
         try:
             # if a process fails, kill them all
+            # print(pid_list[0].pid, pid_list[0].is_alive())
             for pip in pid_list:
                 if not pip.is_alive():
                     for pip_kill in pid_list:
@@ -182,7 +183,7 @@ def parse_opt():
     parser.add_argument('--debug', action='store_true', default=detect_config['infoParameter']['debug'], help='use debug mode')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
-    print_args('detect', opt)
+    print_args('DetectParameters:', opt)
     return opt
 
 

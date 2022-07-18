@@ -1,5 +1,6 @@
 import os
 import time
+import signal
 import platform
 import logging
 import tensorflow as tf
@@ -113,14 +114,19 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
     defect_infos = [[] for i in range(len(curr_defect_cam_num))]
     for infos in info_iter:
         img_path, img_roi, class_name, internal_no, external_no, score = infos
-        _, steel_no, cam_no, img_no, left_edge, right_edge, \
-            roi_x1, roi_x2, roi_y1, roi_y2, \
+        if curr_schema['flag']==0:
+            _, steel_no, cam_no, img_no, left_edge, right_edge, \
+                roi_x1, roi_x2, roi_y1, roi_y2, \
+                img_x1, img_x2, img_y1, img_y2, \
+                steel_x1, steel_x2, steel_y1, steel_y2, _, _, _ = os.path.basename(img_path).split('_')
+        else:
+            _, steel_no, cam_no, img_no, left_edge, right_edge, \
             img_x1, img_x2, img_y1, img_y2, \
-            steel_x1, steel_x2, steel_y1, steel_y2, _ = os.path.basename(img_path).split('_')
+            steel_x1, steel_x2, steel_y1, steel_y2, _, _, _ = os.path.basename(img_path).split('_')
         fx = abs(int(steel_x2)-int(steel_x1))/abs(int(img_x2)-int(img_x1))
         fy = abs(int(steel_y2)-int(steel_y1))/abs(int(img_y2)-int(img_y1))
         # 保存内部编号的缺陷
-        if int(internal_no) in save_intercls:
+        if int(internal_no) in eval(save_intercls):
             img_roi_pil = Image.fromarray(img_roi)
             savedir_ = os.path.join(save_dir_path, steel_no)
             savedir_intercls = os.path.join(savedir_, class_name)
@@ -132,7 +138,7 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
                     except Exception as E:
                         re_print(E)
                         time.sleep(0.1)
-            img_name = f'score({score})_{os.path.basename(img_path)}'
+            img_name = f'{class_name}_score({int(score)})_{os.path.basename(img_path)}'
             new_path = os.path.join(savedir_intercls, img_name)
             img_roi_pil.save(new_path)
         # 需要写入数据库的类别
@@ -142,51 +148,82 @@ def parse_data(info_iter,save_intercls,save_dir_path,curr_defect_cam_num,class_i
             rightToEdge = int(abs(int(right_edge)-int(img_x2)) * fx)
             area = (int(steel_x2)-int(steel_x1))*(int(steel_y2)-int(steel_y1))
             grade, cycle = 0, 0
-            try:
-                # 存数据
-                if curr_schema['flag'] == 0 and not debug:
-                    img_roi_pil = Image.fromarray(img_roi)
-                    dir_path = curr_schema[f'camera{cam_no}']
-                    save_dir_ = os.path.join(dir_path,steel_no)
-                    if not os.path.exists(save_dir_):
-                        while 1:
-                            try:
-                                os.makedirs(save_dir_)
-                                break
-                            except Exception as E:
-                                re_print(E)
-                                time.sleep(0.1)
-                    img_path = os.path.join(save_dir_, f'{defect_id}.bmp')
-                    img_roi_pil.save(img_path)
-                # 整理待写缺陷
-                curr_roi_info = (int(defect_id),
-                                 int(cam_no),
-                                 int(steel_no),
-                                 int(img_no),
-                                 int(external_no),
-                                 int(roi_x1),
-                                 int(roi_x2),
-                                 int(roi_y1),
-                                 int(roi_y2),
-                                 int(img_x1),
-                                 int(img_x2),
-                                 int(img_y1),
-                                 int(img_y2),
-                                 int(steel_x1),
-                                 int(steel_x2),
-                                 int(steel_y1),
-                                 int(steel_y2),
-                                 int(grade),
-                                 int(area),
-                                 int(leftToEdge),
-                                 int(rightToEdge),
-                                 int(cycle)
-                                 )
-                defect_infos[int(cam_no)-1].append(curr_roi_info)
-            except Exception as E:
-                re_print(E)
+            if curr_schema['flag'] == 0:
+                try:
+                    # 存数据
+                    if curr_schema['flag'] == 0 and not debug:
+                        img_roi_pil = Image.fromarray(img_roi)
+                        dir_path = curr_schema[f'camera{cam_no}']
+                        save_dir_ = os.path.join(dir_path,steel_no)
+                        if not os.path.exists(save_dir_):
+                            while 1:
+                                try:
+                                    os.makedirs(save_dir_)
+                                    break
+                                except Exception as E:
+                                    re_print(f'创建目录{save_dir_}出现异常:{E}')
+                                    time.sleep(0.1)
+                        img_path = os.path.join(save_dir_, f'{defect_id}.bmp')
+                        img_roi_pil.save(img_path)
+                    # 整理待写缺陷
+                    curr_roi_info = (int(defect_id),
+                                     int(cam_no),
+                                     int(steel_no),
+                                     int(img_no),
+                                     int(external_no),
+                                     int(roi_x1),
+                                     int(roi_x2),
+                                     int(roi_y1),
+                                     int(roi_y2),
+                                     int(img_x1),
+                                     int(img_x2),
+                                     int(img_y1),
+                                     int(img_y2),
+                                     int(steel_x1),
+                                     int(steel_x2),
+                                     int(steel_y1),
+                                     int(steel_y2),
+                                     int(grade),
+                                     int(area),
+                                     int(leftToEdge),
+                                     int(rightToEdge),
+                                     int(cycle)
+                                     )
+                    defect_infos[int(cam_no)-1].append(curr_roi_info)
+                except Exception as E:
+                    re_print(f'数据整理及存储出现异常:{E}')
+                    os.kill(os.getpid(), signal.SIGINT)
+                else:
+                    curr_defect_cam_num[cam_no] = defect_id
             else:
-                curr_defect_cam_num[cam_no] = defect_id
+                grade = int(score)
+                img_data = None
+                try:
+                    # 整理待写缺陷
+                    curr_roi_info = (int(0),
+                                     int(steel_no),
+                                     int(cam_no),
+                                     int(img_no),
+                                     int(external_no),
+                                     int(grade),
+                                     int(img_x1),
+                                     int(img_x2),
+                                     int(img_y1),
+                                     int(img_y2),
+                                     int(steel_x1),
+                                     int(steel_x2),
+                                     int(steel_y1),
+                                     int(steel_y2),
+                                     int(area),
+                                     int(cycle),
+                                     img_data,
+                                     )
+                    defect_infos[int(cam_no) - 1].append(curr_roi_info)
+                except Exception as E:
+                    re_print(f'数据整理出现异常:{E}')
+                    os.kill(os.getpid(), signal.SIGINT)
+                else:
+                    curr_defect_cam_num[cam_no] = defect_id
     defect_infos = [tuple(ls) for ls in defect_infos]
     return curr_defect_cam_num,tuple(defect_infos)
 
