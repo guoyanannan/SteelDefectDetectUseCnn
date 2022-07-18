@@ -9,11 +9,11 @@ import pandas as pd
 import torch.nn as nn
 import numpy as np
 from threading import Thread
-from .utils.normaloperation import select_device,LOGS,marge_box,xyxy_img_nms,thread_save_rois
-from .utils.general import non_max_suppression,scale_coords
+from detect_yolov5.models.experimental import attempt_load
+from detect_yolov5.utils.normaloperation import select_device,LOGS,marge_box,xyxy_img_nms,thread_save_rois
+from detect_yolov5.utils.general import non_max_suppression,scale_coords
 ROOT = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(ROOT)
-
 
 
 class YOLOInit(nn.Module):
@@ -31,8 +31,7 @@ class YOLOInit(nn.Module):
         self.fp16 &= (pt or jit or onnx) and self.device.type != 'cpu'  # FP16
         if pt:  # PyTorch
             self.log_op.info(f'Loading {w} for PyTorch inference...')
-            ckpt = torch.load(w, map_location='cpu')  # load
-            model = (ckpt.get('ema') or ckpt['model']).float()  # FP32 model
+            model = attempt_load(weights if isinstance(weights, list) else w)
             stride = max(int(model.stride.max()), 32)  # model stride
             names = model.module.names if hasattr(model, 'module') else model.names  # get class names
             model.half() if self.fp16 else model.float()
@@ -76,12 +75,13 @@ class YOLOInit(nn.Module):
             y = torch.tensor(y, device=self.device)
         return (y, []) if val else y
 
-    def warmup(self, imgsz=(1, 3, 320, 3200)):
+    def warmup(self, imgsz=(1, 3, 320, 320)):
         if any((self.pt, self.jit, self.onnx, self.dnn)):  # warmup types
             if self.device.type != 'cpu':  # only warmup GPU models
                 im = torch.zeros(imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
                 for _ in range(2 if self.jit else 1):  #
                     a = self.forward(im)  # warmup
+                    # print(a.shape)
 
     def pre_process_detect(self,
                            im_path,  # 用于存图等的逻辑撰写
@@ -124,6 +124,7 @@ class YOLOInit(nn.Module):
         # (5,10647,6) tensor 4k
         # (9,10647,6) tensor 8k
         pred_bs = self.model(im_bs_scale,augment=self.augment_, visualize=self.visualize_)[0]
+
         # (1,3276,6) tensor 4k
         # (2,3276,6) tensor 8k
         pred_ori = self.model(im_one_scale, augment=self.augment_, visualize=self.visualize_)[0]
@@ -203,6 +204,8 @@ class YOLOInit(nn.Module):
 
         for i, box in enumerate(nms_):
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+            label = self.names[int(box[-1])]
+            score = str(int(box[-2]*100))
             # 越边界
             if x2 <= left_edge or x1 >= right_edge:
                 continue
@@ -226,13 +229,12 @@ class YOLOInit(nn.Module):
                 if abs(x2-x1)*abs(y2-y1) >= 1024 * 1024:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//4, img_roi.shape[0]//4))
                     x1_roi, y1_roi, x2_roi, y2_roi = x1_roi//4, y1_roi//4, x2_roi//4, y2_roi//4
-                elif abs(x2-x1) > 30:
+                elif abs(x2-x1) >= 512:
                     img_roi = cv2.resize(img_roi, (img_roi.shape[1]//3, img_roi.shape[0]))
                     x1_roi,x2_roi = x1_roi//3, x2_roi//3
-                
                 if debug:
                     img_roi_draw = cv2.cvtColor(img_roi, cv2.COLOR_GRAY2RGB)
-                    cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3,lineType=cv2.LINE_AA)
+                    cv2.rectangle(img_roi_draw, (x1_roi, y1_roi), (x2_roi, y2_roi), (255, 0, 0), thickness=3, lineType=cv2.LINE_AA)
             #
             # # 画ROI中的框
             # im_roi_draw = im_roi.copy()
@@ -249,11 +251,11 @@ class YOLOInit(nn.Module):
                 if not schema:
                     roi_file_name = '_'.join([file_name, str(i),
                                               str(x1_roi), str(x2_roi), str(y1_roi), str(y2_roi),
-                                              str(x1), str(x2),str(y1), str(y2),
+                                              str(x1), str(x2), str(y1), str(y2), label, score
                                               ]) + str(file_mat)
                 else:
                     roi_file_name = '_'.join([file_name, str(i),
-                                              str(x1), str(x2), str(y1), str(y2),
+                                              str(x1), str(x2), str(y1), str(y2), label, score
                                               ]) + str(file_mat)
             else:
                 flag_str,steel_no,camera_no,img_index,left_pos,top_pos,fx,fy,_ = file_name.split('_')
@@ -265,6 +267,7 @@ class YOLOInit(nn.Module):
                                               str(x1_roi), str(x2_roi), str(y1_roi), str(y2_roi),
                                               str(x1), str(x2), str(y1), str(y2),
                                               str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
+                                              label, score,
                                               'H'
                                               ]) + str(file_mat)
                 else:
@@ -272,12 +275,13 @@ class YOLOInit(nn.Module):
                                               str(left_edge),str(right_edge),
                                               str(x1), str(x2), str(y1), str(y2),
                                               str(left_in_steel), str(right_in_steel), str(top_in_steel), str(bot_in_steel),
+                                              label, score,
                                               'H'
                                               ]) + str(file_mat)
-            if debug:
+            if debug and not schema:
                 img_roi_info = {'data': img_roi_draw, 'name': roi_file_name}
             else:
-                img_roi_info = {'data':img_roi,'name':roi_file_name}
+                img_roi_info = {'data': img_roi, 'name': roi_file_name}
             # result_roi_q.put(img_roi_info)
             roi_list_.append(img_roi_info)
             
@@ -293,7 +297,7 @@ class YOLOInit(nn.Module):
                 outside = p1[1] - h - 3 >= 0  # label fits outside box
                 p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
                 cv2.rectangle(img_draw_, p1, p2, color, -1, cv2.LINE_AA)  # filled
-                cv2.putText(img_draw_, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color,thickness=tf, lineType=cv2.LINE_AA)
+                cv2.putText(img_draw_, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color, thickness=tf, lineType=cv2.LINE_AA)
                 # 边界
                 cv2.line(img_draw_, (left_edge, 0), (left_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
                 cv2.line(img_draw_, (right_edge, 0), (right_edge, img_draw_.shape[0] - 1), (255, 0, 0), 3)
